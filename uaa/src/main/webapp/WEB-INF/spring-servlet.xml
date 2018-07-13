@@ -504,10 +504,11 @@
     </bean>
 
     <context:annotation-config/>
-    <!--<context:component-scan base-package="org.cloudfoundry.identity.uaa.impl.config"></context:component-scan>-->
     <bean id="restTemplateConfig" class="org.cloudfoundry.identity.uaa.impl.config.RestTemplateConfig"/>
-    <bean id="fileSpConfiguration" class="org.cloudfoundry.identity.uaa.impl.config.FileServiceProviderConfiguration"/>
-    <bean id="fileIdpConfiguration" class="org.cloudfoundry.identity.uaa.impl.config.FileIdentityProviderConfiguration"/>
+
+    <!-- SAML Java Configuration -->
+    <context:component-scan base-package="org.cloudfoundry.identity.uaa.impl.config.saml"/>
+
 
     <bean id="idpBootstrap" class="org.cloudfoundry.identity.uaa.impl.config.IdentityProviderBootstrap">
         <constructor-arg ref="identityProviderProvisioning"/>
@@ -560,6 +561,8 @@
                            @config['login']['saml']==null ? null :
                            @config['login']['saml']['keys']}"/>
         <property name="disableSamlInResponseToCheck" value="${login.saml.disableInResponseToCheck:false}"/>
+        <property name="samlSpEntityId" ref="samlEntityID"/>
+        <property name="samlSpEntityAlias" ref="samlSPAlias"/>
         <property name="defaultUserGroups" ref="defaultUserAuthorities"/>
         <property name="mfaEnabled" value="${login.mfa.enabled:false}"/>
         <property name="mfaProviderName" value="${login.mfa.providerName:#{null}}"/>

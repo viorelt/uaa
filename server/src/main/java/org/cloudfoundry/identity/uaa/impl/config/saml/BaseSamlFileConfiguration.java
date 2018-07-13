@@ -12,7 +12,7 @@
  *  ****************************************************************************
  */
 
-package org.cloudfoundry.identity.uaa.impl.config;
+package org.cloudfoundry.identity.uaa.impl.config.saml;
 
 import org.springframework.beans.factory.annotation.Value;
 

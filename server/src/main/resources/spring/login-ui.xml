@@ -284,12 +284,24 @@
     <bean id="reAuthenticationRequiredFilter" class="org.cloudfoundry.identity.uaa.authentication.ReAuthenticationRequiredFilter">
     </bean>
 
-    <http name="idpSecurity"
+    <http name="samlIdpSecurity"
           use-expressions="true"
-          pattern="/saml/idp/SSO/**"
+          pattern="/saml/idp/**"
           entry-point-ref="loginEntryPoint"
           xmlns="http://www.springframework.org/schema/security">
-        <intercept-url pattern="/**" access="isFullyAuthenticated()"/>
+        <intercept-url pattern="/SSO/**" access="isFullyAuthenticated()"/>
+        <intercept-url pattern="/**" access="permitAll()"/>
+        <custom-filter ref="samlFilter" position="LAST"/>
+        <csrf disabled="true"/>
+    </http>
+
+    <http name="samlSpSecurity"
+          use-expressions="true"
+          pattern="/saml/**"
+          entry-point-ref="loginEntryPoint"
+          xmlns="http://www.springframework.org/schema/security">
+        <intercept-url pattern="/**" access="permitAll()"/>
+        <custom-filter ref="samlFilter" position="LAST"/>
         <csrf disabled="true"/>
     </http>
 
