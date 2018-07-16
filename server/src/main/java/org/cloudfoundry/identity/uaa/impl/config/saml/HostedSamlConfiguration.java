@@ -17,10 +17,16 @@ package org.cloudfoundry.identity.uaa.impl.config.saml;
 import java.util.Arrays;
 import java.util.List;
 
+import org.cloudfoundry.identity.uaa.provider.IdentityProviderProvisioning;
+import org.cloudfoundry.identity.uaa.provider.saml.LoginSamlAuthenticationProvider;
 import org.cloudfoundry.identity.uaa.saml.SamlConfigurationProvider;
+import org.cloudfoundry.identity.uaa.scim.ScimGroupExternalMembershipManager;
+import org.cloudfoundry.identity.uaa.user.UaaUserDatabase;
 
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.saml.SamlMessageHandler;
 import org.springframework.security.saml.config.SamlServerConfiguration;
 import org.springframework.security.saml.spi.AbstractProviderConfiguration;
@@ -29,6 +35,20 @@ import org.springframework.security.saml.spi.DefaultSpResponseHandler;
 
 @Configuration
 public class HostedSamlConfiguration extends AbstractProviderConfiguration {
+
+    private UaaUserDatabase userDatabase;
+    private IdentityProviderProvisioning identityProviderProvisioning;
+    private ScimGroupExternalMembershipManager externalMembershipManager;
+
+    public HostedSamlConfiguration(
+        @Qualifier("userDatabase") UaaUserDatabase userDb,
+        @Qualifier("identityProviderProvisioning") IdentityProviderProvisioning idpProvisioning,
+        @Qualifier("externalGroupMembershipManager") ScimGroupExternalMembershipManager extMbrManager) {
+
+        this.userDatabase = userDb;
+        this.identityProviderProvisioning = idpProvisioning;
+        this.externalMembershipManager = extMbrManager;
+    }
 
     @Bean
     public SamlServerConfiguration samlServerConfiguration() {
@@ -48,6 +68,7 @@ public class HostedSamlConfiguration extends AbstractProviderConfiguration {
     @Bean
     public SamlMessageHandler spResponseHandler(SamlServerConfiguration configuration) {
         return new DefaultSpResponseHandler()
+            .setAuthenticationManager(samlAuthenticationManager())
             .setDefaults(defaults())
             .setNetwork(network(configuration))
             .setResolver(resolver())
@@ -72,4 +93,15 @@ public class HostedSamlConfiguration extends AbstractProviderConfiguration {
             spResponseHandler(configuration)
         );
     }
+
+    @Bean(name = "samlAuthenticationProvider")
+    public AuthenticationManager samlAuthenticationManager() {
+        LoginSamlAuthenticationProvider result = new LoginSamlAuthenticationProvider();
+        result.setUserDatabase(userDatabase);
+        result.setIdentityProviderProvisioning(identityProviderProvisioning);
+        result.setExternalMembershipManager(externalMembershipManager);
+        return result;
+
+    }
+
 }
