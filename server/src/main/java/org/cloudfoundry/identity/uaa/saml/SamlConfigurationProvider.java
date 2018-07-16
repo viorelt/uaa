@@ -39,11 +39,31 @@ import static org.springframework.util.StringUtils.hasText;
 public class SamlConfigurationProvider extends SamlServerConfiguration {
 
     @Override
+    public LocalIdentityProviderConfiguration getIdentityProvider() {
+        IdentityZoneConfiguration zconfig = getIdentityZone().getConfig();
+        SamlConfig samlConfig = zconfig.getSamlConfig();
+        return getIdentityProvider(samlConfig);
+
+    }
+
+    @Override
     public LocalServiceProviderConfiguration getServiceProvider() {
         IdentityZoneConfiguration zconfig = getIdentityZone().getConfig();
         SamlConfig samlConfig = zconfig.getSamlConfig();
-
         return getServiceProvider(samlConfig);
+    }
+
+    protected LocalIdentityProviderConfiguration getIdentityProvider(SamlConfig samlConfig) {
+        String entityId = getEntityId(samlConfig);
+        return new LocalIdentityProviderConfiguration()
+            //.setSignAssertions(samlConfig.isAssertionSigned())
+            .setSingleLogoutEnabled(false)
+            .setEntityId(entityId)
+            .setAlias(getHostIfArgIsURL(entityId))
+            .setKeys(getKeys(samlConfig))
+            .setPrefix("saml/idp/")
+            .setSignMetadata(true)
+            ;
     }
 
     protected LocalServiceProviderConfiguration getServiceProvider(SamlConfig samlConfig) {
@@ -112,11 +132,6 @@ public class SamlConfigurationProvider extends SamlServerConfiguration {
             samlKey.getPassphrase(),
             KeyType.SIGNING
         );
-    }
-
-    @Override
-    public LocalIdentityProviderConfiguration getIdentityProvider() {
-        return null;
     }
 
     protected IdentityZone getIdentityZone() {
