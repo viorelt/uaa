@@ -20,12 +20,17 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import org.cloudfoundry.identity.uaa.constants.OriginKeys;
+import org.cloudfoundry.identity.uaa.provider.IdentityProvider;
+import org.cloudfoundry.identity.uaa.provider.IdentityProviderProvisioning;
+import org.cloudfoundry.identity.uaa.provider.SamlIdentityProviderDefinition;
 import org.cloudfoundry.identity.uaa.util.UaaUrlUtils;
 import org.cloudfoundry.identity.uaa.zone.IdentityZone;
 import org.cloudfoundry.identity.uaa.zone.IdentityZoneConfiguration;
 import org.cloudfoundry.identity.uaa.zone.IdentityZoneHolder;
 import org.cloudfoundry.identity.uaa.zone.SamlConfig;
 
+import org.springframework.security.saml.config.ExternalIdentityProviderConfiguration;
 import org.springframework.security.saml.config.LocalIdentityProviderConfiguration;
 import org.springframework.security.saml.config.LocalServiceProviderConfiguration;
 import org.springframework.security.saml.config.RotatingKeys;
@@ -38,6 +43,12 @@ import static org.springframework.util.StringUtils.hasText;
 
 public class SamlConfigurationProvider extends SamlServerConfiguration {
 
+    private final IdentityProviderProvisioning provisioning;
+
+    public SamlConfigurationProvider(IdentityProviderProvisioning provisioning) {
+        this.provisioning = provisioning;
+    }
+
     @Override
     public LocalIdentityProviderConfiguration getIdentityProvider() {
         IdentityZoneConfiguration zconfig = getIdentityZone().getConfig();
@@ -48,9 +59,10 @@ public class SamlConfigurationProvider extends SamlServerConfiguration {
 
     @Override
     public LocalServiceProviderConfiguration getServiceProvider() {
-        IdentityZoneConfiguration zconfig = getIdentityZone().getConfig();
+        IdentityZone identityZone = getIdentityZone();
+        IdentityZoneConfiguration zconfig = identityZone.getConfig();
         SamlConfig samlConfig = zconfig.getSamlConfig();
-        return getServiceProvider(samlConfig);
+        return getServiceProvider(samlConfig, identityZone.getId());
     }
 
     protected LocalIdentityProviderConfiguration getIdentityProvider(SamlConfig samlConfig) {
@@ -66,7 +78,7 @@ public class SamlConfigurationProvider extends SamlServerConfiguration {
             ;
     }
 
-    protected LocalServiceProviderConfiguration getServiceProvider(SamlConfig samlConfig) {
+    protected LocalServiceProviderConfiguration getServiceProvider(SamlConfig samlConfig, String zoneId) {
         String entityId = getEntityId(samlConfig);
         LocalServiceProviderConfiguration result = new LocalServiceProviderConfiguration()
             .setSignRequests(samlConfig.isRequestSigned())
@@ -76,9 +88,30 @@ public class SamlConfigurationProvider extends SamlServerConfiguration {
             .setKeys(getKeys(samlConfig))
             .setPrefix("saml/")
             .setSignMetadata(true)
-            .setSingleLogoutEnabled(true)
-            ;
+            .setSingleLogoutEnabled(true);
+        //TODO add all the configured IDPs here
+        List<IdentityProvider> activeProviders = provisioning.retrieveAll(true, zoneId);
+        List<ExternalIdentityProviderConfiguration> idps =
+            (List<ExternalIdentityProviderConfiguration>)activeProviders
+                .stream()
+                .filter(p -> OriginKeys.SAML.equals(p.getType()))
+                .map(
+                    p -> getProviderConfiguration(p)
+                )
+                .collect(Collectors.toList());
+        result.setProviders(idps);
         return result;
+    }
+
+    protected ExternalIdentityProviderConfiguration getProviderConfiguration(
+        IdentityProvider<SamlIdentityProviderDefinition> provider
+    ) {
+        return new ExternalIdentityProviderConfiguration()
+            .setAlias(provider.getOriginKey())
+            .setAssertionConsumerServiceIndex(provider.getConfig().getAssertionConsumerIndex())
+            .setLinktext(provider.getConfig().getLinkText())
+            .setSkipSslValidation(provider.getConfig().isSkipSslValidation())
+            .setMetadata(provider.getConfig().getMetaDataLocation());
     }
 
     protected String getEntityId(SamlConfig samlConfig) {
@@ -99,7 +132,7 @@ public class SamlConfigurationProvider extends SamlServerConfiguration {
         String activeKeyId = samlConfig.getActiveKeyId();
         SamlKey active = samlConfig.getKeys().get(activeKeyId);
         Set<Map.Entry<String, SamlKey>> standbyEntries = samlConfig.getKeys().entrySet();
-        if (active==null) {
+        if (active == null) {
             if (samlConfig.getKeys().isEmpty()) {
                 //inherit from default zone
                 SamlConfig defaultConfig = IdentityZoneHolder.getUaaZone().getConfig().getSamlConfig();

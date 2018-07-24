@@ -72,6 +72,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.saml.SamlAuthentication;
 import org.springframework.security.saml.SamlObjectResolver;
+import org.springframework.security.saml.saml2.authentication.Assertion;
 import org.springframework.security.saml.saml2.authentication.AuthenticationContextClassReference;
 import org.springframework.security.saml.saml2.authentication.AuthenticationStatement;
 import org.springframework.security.saml.saml2.metadata.IdentityProviderMetadata;
@@ -111,6 +112,10 @@ public class LoginSamlAuthenticationProvider implements AuthenticationManager,Ap
         this.externalMembershipManager = externalMembershipManager;
     }
 
+    public LoginSamlAuthenticationProvider setResolver(SamlObjectResolver resolver) {
+        this.resolver = resolver;
+        return this;
+    }
 
     @Override
     public void setApplicationEventPublisher(ApplicationEventPublisher eventPublisher) {
@@ -174,10 +179,15 @@ public class LoginSamlAuthenticationProvider implements AuthenticationManager,Ap
                 throw new BadCredentialsException("Identity Provider did not authenticate with the requested AuthnContext.");
             }
         }
-
+        long sessionExpiration = getAuthenticationExpiration(token.getAssertion());
         UaaUser user = createIfMissing(samlPrincipal, addNew, authorities, userAttributes);
         UaaPrincipal principal = new UaaPrincipal(user);
-        UaaAuthentication resultUaaAuthentication = new LoginSamlAuthenticationToken(principal, token).getUaaAuthentication(user.getAuthorities(), filteredExternalGroups, userAttributes);
+        UaaAuthentication resultUaaAuthentication = new LoginSamlAuthenticationToken(principal, token)
+            .getUaaAuthentication(user.getAuthorities(),
+                                  filteredExternalGroups,
+                                  userAttributes,
+                                  sessionExpiration
+            );
         publish(new IdentityProviderAuthenticationSuccessEvent(user, resultUaaAuthentication, OriginKeys.SAML));
         if (samlConfig.isStoreCustomAttributes()) {
             userDatabase.storeUserInfo(user.getId(),
@@ -189,6 +199,17 @@ public class LoginSamlAuthenticationProvider implements AuthenticationManager,Ap
         configureRelayRedirect(relayState);
 
         return resultUaaAuthentication;
+    }
+
+    protected long getAuthenticationExpiration(Assertion assertion) {
+        long result = Long.MAX_VALUE;
+        for (AuthenticationStatement statement : assertion.getAuthenticationStatements()) {
+            DateTime sessionNotOnOrAfter = statement.getSessionNotOnOrAfter();
+            if (sessionNotOnOrAfter!=null) {
+                result = Math.min(result, sessionNotOnOrAfter.getMillis());
+            }
+        }
+        return result;
     }
 
     public void configureRelayRedirect(String relayState) {
