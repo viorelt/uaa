@@ -30,7 +30,6 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.saml.SamlMessageHandler;
 import org.springframework.security.saml.config.SamlServerConfiguration;
 import org.springframework.security.saml.spi.AbstractProviderConfiguration;
-import org.springframework.security.saml.spi.DefaultAuthnRequestHandler;
 import org.springframework.security.saml.spi.DefaultSpResponseHandler;
 
 @Configuration
@@ -52,13 +51,13 @@ public class HostedSamlConfiguration extends AbstractProviderConfiguration {
 
     @Bean
     public SamlServerConfiguration samlServerConfiguration() {
-        return new SamlConfigurationProvider();
+        return new SamlConfigurationProvider(identityProviderProvisioning);
     }
 
     @Bean
     public SamlMessageHandler discoveryHandler(SamlServerConfiguration configuration) {
-        return new DefaultAuthnRequestHandler()
-            .setDefaults(defaults())
+        return new SamlDiscoveryHandler()
+            .setSamlDefaults(samlDefaults())
             .setNetwork(network(configuration))
             .setResolver(resolver())
             .setTransformer(transformer())
@@ -69,7 +68,7 @@ public class HostedSamlConfiguration extends AbstractProviderConfiguration {
     public SamlMessageHandler spResponseHandler(SamlServerConfiguration configuration) {
         return new DefaultSpResponseHandler()
             .setAuthenticationManager(samlAuthenticationManager())
-            .setDefaults(defaults())
+            .setSamlDefaults(samlDefaults())
             .setNetwork(network(configuration))
             .setResolver(resolver())
             .setTransformer(transformer())
@@ -100,6 +99,7 @@ public class HostedSamlConfiguration extends AbstractProviderConfiguration {
         result.setUserDatabase(userDatabase);
         result.setIdentityProviderProvisioning(identityProviderProvisioning);
         result.setExternalMembershipManager(externalMembershipManager);
+        result.setResolver(resolver());
         return result;
 
     }

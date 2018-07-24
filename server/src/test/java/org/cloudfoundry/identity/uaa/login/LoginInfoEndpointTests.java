@@ -590,10 +590,19 @@ public class LoginInfoEndpointTests {
         UaaAuthentication uaaAuthentication = new UaaAuthentication(marissa, new ArrayList<GrantedAuthority>(),new UaaAuthenticationDetails(new MockHttpServletRequest()));
         assertEquals("passcode", endpoint.generatePasscode(model, uaaAuthentication));
         SamlAuthentication expiringUsernameAuthenticationToken = null;//new ExpiringUsernameAuthenticationToken("princpal", "");
-        UaaAuthentication samlAuthenticationToken = new LoginSamlAuthenticationToken(marissa, expiringUsernameAuthenticationToken).getUaaAuthentication(emptyList(), emptySet(), new LinkedMultiValueMap<>());
+        long sessionExpiration = System.currentTimeMillis();
+        UaaAuthentication samlAuthenticationToken =
+            new LoginSamlAuthenticationToken(marissa, expiringUsernameAuthenticationToken)
+                .getUaaAuthentication(
+                    emptyList(),
+                    emptySet(),
+                    new LinkedMultiValueMap<>(),
+                    sessionExpiration
+                );
         assertEquals("passcode", endpoint.generatePasscode(model, samlAuthenticationToken));
         //token with a UaaPrincipal should always work
         assertEquals("passcode", endpoint.generatePasscode(model, expiringUsernameAuthenticationToken));
+        assertEquals(sessionExpiration, samlAuthenticationToken.getExpiresAt());
     }
 
     @Test(expected = LoginInfoEndpoint.UnknownPrincipalException.class)
