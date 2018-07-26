@@ -81,10 +81,6 @@
         <constructor-arg ref="idpProviders"/>
     </bean>
 
-    <bean id="idpProviders" class="org.cloudfoundry.identity.uaa.provider.saml.SamlIdentityProviderConfigurator">
-        <property name="identityProviderProvisioning" ref="identityProviderProvisioning"/>
-    </bean>
-
     <http name="identityZoneSecurity" pattern="/identity-zones/**" create-session="stateless"
           entry-point-ref="oauthAuthenticationEntryPoint"
           use-expressions="true" authentication-manager-ref="emptyAuthenticationManager"

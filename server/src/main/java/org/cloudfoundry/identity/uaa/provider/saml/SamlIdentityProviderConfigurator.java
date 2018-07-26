@@ -14,7 +14,6 @@ package org.cloudfoundry.identity.uaa.provider.saml;
 
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.nio.charset.StandardCharsets;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -27,6 +26,8 @@ import org.cloudfoundry.identity.uaa.zone.IdentityZoneHolder;
 
 import org.apache.http.client.utils.URIBuilder;
 import org.springframework.beans.factory.InitializingBean;
+import org.springframework.security.saml.SamlObjectResolver;
+import org.springframework.security.saml.config.ExternalIdentityProviderConfiguration;
 import org.springframework.security.saml.saml2.metadata.IdentityProviderMetadata;
 import org.springframework.util.StringUtils;
 
@@ -34,6 +35,7 @@ import static org.springframework.util.StringUtils.hasText;
 
 public class SamlIdentityProviderConfigurator implements InitializingBean {
     private IdentityProviderProvisioning providerProvisioning;
+    private SamlObjectResolver resolver;
 
     public SamlIdentityProviderConfigurator() {
     }
@@ -128,15 +130,19 @@ public class SamlIdentityProviderConfigurator implements InitializingBean {
         String alias = def.getIdpEntityAlias();
         String metadata = def.getMetaDataLocation();
         IdentityProviderMetadata delegate = null;
-        throw new UnsupportedOperationException();
+
+        ExternalIdentityProviderConfiguration config = new ExternalIdentityProviderConfiguration()
+            .setAlias(alias)
+            .setMetadata(metadata)
+            .setSkipSslValidation(def.isSkipSslValidation());
+
+        return resolver.resolveIdentityProvider(config);
 //        configMetadataProvider.setParserPool(getParserPool());
 //        ExtendedMetadata extendedMetadata = new ExtendedMetadata();
 //        extendedMetadata.setLocal(false);
 //        extendedMetadata.setAlias(def.getIdpEntityAlias());
 //        ExtendedMetadataDelegate delegate = new ExtendedMetadataDelegate(configMetadataProvider, extendedMetadata);
 //        delegate.setMetadataTrustCheck(def.isMetadataTrustCheck());
-
-
     }
 
 
@@ -156,17 +162,7 @@ public class SamlIdentityProviderConfigurator implements InitializingBean {
     }
 
     protected IdentityProviderMetadata configureURLMetadata(SamlIdentityProviderDefinition def) {
-        try {
-            def = def.clone();
-            String adjustedMetatadataURIForPort = adjustURIForPort(def.getMetaDataLocation());
-
-            byte[] metadata = new byte[0];
-
-            def.setMetaDataLocation(new String(metadata, StandardCharsets.UTF_8));
-            return configureXMLMetadata(def);
-        } catch (URISyntaxException e) {
-            throw new RuntimeException("Invalid socket factory(invalid URI):" + def.getMetaDataLocation(), e);
-        }
+        return configureXMLMetadata(def);
     }
 
     public IdentityProviderProvisioning getIdentityProviderProvisioning() {
@@ -177,7 +173,10 @@ public class SamlIdentityProviderConfigurator implements InitializingBean {
         this.providerProvisioning = providerProvisioning;
     }
 
-
+    public SamlIdentityProviderConfigurator setResolver(SamlObjectResolver resolver) {
+        this.resolver = resolver;
+        return this;
+    }
 
     @Override
     public void afterPropertiesSet() throws Exception {
