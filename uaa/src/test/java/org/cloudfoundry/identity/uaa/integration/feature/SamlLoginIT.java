@@ -286,7 +286,7 @@ public class SamlLoginIT {
         webDriver.findElement(By.name("username")).sendKeys(testAccounts.getUserName());
         webDriver.findElement(By.name("password")).sendKeys(testAccounts.getPassword());
         webDriver.findElement(By.xpath("//input[@value='Login']")).click();
-
+        IntegrationTestUtils.takeScreenShot("saml-test", webDriver);
         assertEquals("No local entity found for alias invalid, verify your configuration.", webDriver.findElement(By.cssSelector("h2")).getText());
     }
 

@@ -19,6 +19,7 @@ import java.util.List;
 
 import org.cloudfoundry.identity.uaa.provider.IdentityProviderProvisioning;
 import org.cloudfoundry.identity.uaa.provider.saml.LoginSamlAuthenticationProvider;
+import org.cloudfoundry.identity.uaa.provider.saml.SamlIdentityProviderConfigurator;
 import org.cloudfoundry.identity.uaa.saml.SamlConfigurationProvider;
 import org.cloudfoundry.identity.uaa.scim.ScimGroupExternalMembershipManager;
 import org.cloudfoundry.identity.uaa.user.UaaUserDatabase;
@@ -101,7 +102,22 @@ public class HostedSamlConfiguration extends AbstractProviderConfiguration {
         result.setExternalMembershipManager(externalMembershipManager);
         result.setResolver(resolver());
         return result;
+    }
 
+//    <bean id="idpProviders" class="org.cloudfoundry.identity.uaa.provider.saml.SamlIdentityProviderConfigurator">
+//        <property name="identityProviderProvisioning" ref="identityProviderProvisioning"/>
+//    </bean>
+    @Bean(name = "idpProviders")
+    public SamlIdentityProviderConfigurator idpProviders() {
+        return samlIdentityProviderConfigurator();
+    }
+
+    @Bean(name = "metaDataProviders")
+    public SamlIdentityProviderConfigurator samlIdentityProviderConfigurator() {
+        SamlIdentityProviderConfigurator result = new SamlIdentityProviderConfigurator();
+        result.setIdentityProviderProvisioning(identityProviderProvisioning);
+        result.setResolver(resolver());
+        return result;
     }
 
 }
