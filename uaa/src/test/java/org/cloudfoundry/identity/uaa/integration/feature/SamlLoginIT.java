@@ -314,7 +314,8 @@ public class SamlLoginIT {
         webDriver.findElement(By.name("password")).sendKeys(testAccounts.getPassword());
         webDriver.findElement(By.xpath("//input[@value='Login']")).click();
         IntegrationTestUtils.takeScreenShot("saml-test", webDriver);
-        assertEquals("No local entity found for alias invalid, verify your configuration.", webDriver.findElement(By.cssSelector("h2")).getText());
+        //assertEquals("No local entity found for alias invalid, verify your configuration.", webDriver.findElement(By.cssSelector("h2")).getText());
+        assertEquals("SAML Validation Errors: Destination mismatch: http://testzone3.localhost:8080/uaa/saml/SSO/alias/invalid;", webDriver.findElement(By.cssSelector("h2")).getText());
     }
 
     @Test

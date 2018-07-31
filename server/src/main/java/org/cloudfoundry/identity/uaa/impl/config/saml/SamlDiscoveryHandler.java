@@ -35,6 +35,8 @@ public class SamlDiscoveryHandler extends DefaultAuthnRequestHandler {
 
     @SuppressWarnings("checked")
     protected ExternalIdentityProviderConfiguration getSamlIdp(HttpServletRequest request) {
+        //in the library implementation the `idp` parameter is the entityId
+        //in UAA, the idp parameter is the alias
         String idp = request.getParameter("idp");
         LocalServiceProviderConfiguration config = getConfiguration().getServiceProvider();
         Optional<ExternalIdentityProviderConfiguration> result =
