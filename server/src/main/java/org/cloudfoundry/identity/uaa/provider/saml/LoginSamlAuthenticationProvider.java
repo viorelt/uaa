@@ -133,7 +133,7 @@ public class LoginSamlAuthenticationProvider implements AuthenticationManager,Ap
         SamlAuthentication token = (SamlAuthentication) authentication;
         IdentityProviderMetadata idpm = resolver.resolveIdentityProvider(token.getAssertingEntityId());
         String alias = idpm.getEntityAlias();
-        String relayState = "";
+        String relayState = token.getRelayState();
         boolean addNew;
         IdentityProvider<SamlIdentityProviderDefinition> idp;
         SamlIdentityProviderDefinition samlConfig;

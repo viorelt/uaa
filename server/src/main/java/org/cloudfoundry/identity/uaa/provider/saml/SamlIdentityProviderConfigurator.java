@@ -24,8 +24,11 @@ import org.cloudfoundry.identity.uaa.provider.SamlIdentityProviderDefinition;
 import org.cloudfoundry.identity.uaa.zone.IdentityZone;
 import org.cloudfoundry.identity.uaa.zone.IdentityZoneHolder;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.http.client.utils.URIBuilder;
 import org.springframework.beans.factory.InitializingBean;
+import org.springframework.security.saml.SamlException;
 import org.springframework.security.saml.SamlObjectResolver;
 import org.springframework.security.saml.config.ExternalIdentityProviderConfiguration;
 import org.springframework.security.saml.saml2.metadata.IdentityProviderMetadata;
@@ -34,6 +37,8 @@ import org.springframework.util.StringUtils;
 import static org.springframework.util.StringUtils.hasText;
 
 public class SamlIdentityProviderConfigurator implements InitializingBean {
+    private static Log logger = LogFactory.getLog(SamlIdentityProviderConfigurator.class);
+
     private IdentityProviderProvisioning providerProvisioning;
     private SamlObjectResolver resolver;
 
@@ -94,11 +99,18 @@ public class SamlIdentityProviderConfigurator implements InitializingBean {
         boolean entityIDexists = false;
 
         for (SamlIdentityProviderDefinition existing : getIdentityProviderDefinitions()) {
-            IdentityProviderMetadata existingProvider = getExtendedMetadataDelegate(existing);
-            if (entityIDToBeAdded.equals(existingProvider.getEntityId()) &&
-              !(existing.getUniqueAlias().equals(clone.getUniqueAlias()))) {
-                entityIDexists = true;
-                break;
+            try {
+                IdentityProviderMetadata existingProvider = getExtendedMetadataDelegate(existing);
+                if (entityIDToBeAdded.equals(existingProvider.getEntityId()) &&
+                  !(existing.getUniqueAlias().equals(clone.getUniqueAlias()))) {
+                    entityIDexists = true;
+                    break;
+                }
+            } catch (SamlException e) {
+                logger.debug(
+                    "Unable to process SAML provider:"+existing.getMetaDataLocation()+". No duplicate check performed",
+                    e
+                );
             }
         }
 
