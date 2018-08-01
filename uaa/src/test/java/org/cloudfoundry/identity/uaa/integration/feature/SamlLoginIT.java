@@ -114,8 +114,8 @@ public class SamlLoginIT {
     @Autowired @Rule
     public IntegrationTestRule integrationTestRule;
 
-    @Rule
-    public RetryRule retryRule = new RetryRule(3);
+//    @Rule
+//    public RetryRule retryRule = new RetryRule(3);
 
     @Rule
     public ScreenshotOnFail screenShootRule = new ScreenshotOnFail();
