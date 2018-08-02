@@ -68,6 +68,7 @@ public class HostedSamlConfiguration extends AbstractProviderConfiguration {
     }
 
     @Override
+    @Bean
     public SamlObjectResolver resolver() {
         return new SamlMetadataResolver();
     }

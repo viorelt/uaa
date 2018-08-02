@@ -26,6 +26,8 @@ import org.cloudfoundry.identity.uaa.zone.IdentityZoneHolder;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.security.saml.SamlObjectResolver;
+import org.springframework.security.saml.config.ExternalServiceProviderConfiguration;
 import org.springframework.security.saml.saml2.metadata.NameId;
 import org.springframework.security.saml.saml2.metadata.ServiceProviderMetadata;
 import org.springframework.util.StringUtils;
@@ -37,6 +39,7 @@ public class SamlServiceProviderConfigurator {
     private static final Logger LOG = LoggerFactory.getLogger(SamlServiceProviderConfigurator.class);
 
     private SamlServiceProviderProvisioning providerProvisioning;
+    private SamlObjectResolver resolver;
     private Set<NameId> supportedNameIDs = new HashSet<>(
         Arrays.asList(
             NameId.EMAIL,
@@ -142,11 +145,23 @@ public class SamlServiceProviderConfigurator {
 //        ExtendedMetadataDelegate delegate = new ExtendedMetadataDelegate(configMetadataProvider, extendedMetadata);
 //        delegate.setMetadataTrustCheck(provider.getConfig().isMetadataTrustCheck());
 
-        throw new UnsupportedOperationException();
+        String zoneId = provider.getIdentityZoneId();
+        String alias = provider.getEntityId();
+        String metadata = provider.getConfig().getMetaDataLocation();
+        ServiceProviderMetadata delegate = null;
+
+        ExternalServiceProviderConfiguration config = new ExternalServiceProviderConfiguration()
+            .setAlias(alias)
+            .setMetadata(metadata)
+            .setSkipSslValidation(provider.getConfig().isSkipSslValidation())
+            .setMetadataTrustCheck(provider.getConfig().isMetadataTrustCheck());
+
+        return getResolver().resolveServiceProvider(config);
+
     }
 
     protected ServiceProviderMetadata configureURLMetadata(SamlServiceProvider provider) throws RuntimeException {
-        throw new UnsupportedOperationException();
+        return configureXMLMetadata(provider);
     }
 
     public SamlServiceProviderProvisioning getProviderProvisioning() {
@@ -161,4 +176,12 @@ public class SamlServiceProviderConfigurator {
         this.supportedNameIDs = supportedNameIDs;
     }
 
+    public SamlServiceProviderConfigurator setResolver(SamlObjectResolver resolver) {
+        this.resolver = resolver;
+        return this;
+    }
+
+    public SamlObjectResolver getResolver() {
+        return resolver;
+    }
 }
