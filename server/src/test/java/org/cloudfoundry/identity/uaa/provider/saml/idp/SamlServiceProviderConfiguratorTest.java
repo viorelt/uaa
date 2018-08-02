@@ -14,6 +14,7 @@
  */
 package org.cloudfoundry.identity.uaa.provider.saml.idp;
 
+import java.time.Clock;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
@@ -27,10 +28,17 @@ import org.cloudfoundry.identity.uaa.zone.IdentityZoneHolder;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.springframework.security.oauth2.common.util.RandomValueStringGenerator;
+import org.springframework.security.saml.spi.DefaultMetadataCache;
+import org.springframework.security.saml.spi.DefaultSamlObjectResolver;
+import org.springframework.security.saml.spi.DefaultSamlTransformer;
+import org.springframework.security.saml.spi.SpringSecuritySaml;
+import org.springframework.security.saml.spi.opensaml.OpenSamlImplementation;
+import org.springframework.security.saml.util.Network;
 
 import static org.cloudfoundry.identity.uaa.provider.saml.idp.SamlTestUtils.MOCK_SP_ENTITY_ID;
 import static org.cloudfoundry.identity.uaa.provider.saml.idp.SamlTestUtils.mockSamlServiceProvider;
@@ -44,6 +52,14 @@ import static org.mockito.Mockito.when;
 
 
 public class SamlServiceProviderConfiguratorTest {
+
+    private static SpringSecuritySaml implementation;
+    private Network mockNetwork = mock(Network.class);
+
+    @BeforeClass
+    public static void initializeOpenSAML() throws Exception {
+        implementation = new OpenSamlImplementation(Clock.systemUTC()).init();
+    }
 
     private final SamlTestUtils samlTestUtils = new SamlTestUtils();
 
@@ -61,6 +77,11 @@ public class SamlServiceProviderConfiguratorTest {
     public void setup() throws Exception {
         samlTestUtils.initialize();
         conf = new SamlServiceProviderConfigurator();
+        conf.setResolver(
+            new DefaultSamlObjectResolver()
+                .setTransformer(new DefaultSamlTransformer(implementation))
+                .setMetadataCache(new DefaultMetadataCache(Clock.systemUTC(), mockNetwork))
+        );
         providerProvisioning = mock(SamlServiceProviderProvisioning.class);
         conf.setProviderProvisioning(providerProvisioning);
 
@@ -200,7 +221,7 @@ public class SamlServiceProviderConfiguratorTest {
     public void testGetExtendedMetadataDelegateUrl() throws Exception {
         slowHttpServer.run();
         expectedEx.expect(RuntimeException.class);
-        expectedEx.expectMessage("Unavailable Metadata Provider");
+        expectedEx.expectMessage("Unable to successfully get metadata from:https://localhost:23439");
 
         SamlServiceProvider provider = mockSamlServiceProviderMetadatauriForZone("https://localhost:" + SlowHttpServer.PORT);
 

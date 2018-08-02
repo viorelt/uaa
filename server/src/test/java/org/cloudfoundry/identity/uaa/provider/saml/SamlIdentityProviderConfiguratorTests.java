@@ -36,27 +36,32 @@ import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.springframework.security.oauth2.common.util.RandomValueStringGenerator;
 import org.springframework.security.saml.saml2.metadata.IdentityProviderMetadata;
+import org.springframework.security.saml.spi.DefaultMetadataCache;
+import org.springframework.security.saml.spi.DefaultSamlObjectResolver;
+import org.springframework.security.saml.spi.DefaultSamlTransformer;
 import org.springframework.security.saml.spi.SpringSecuritySaml;
 import org.springframework.security.saml.spi.opensaml.OpenSamlImplementation;
+import org.springframework.security.saml.util.Network;
 
 import static java.util.Arrays.asList;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 public class SamlIdentityProviderConfiguratorTests {
 
-    private Runnable stopHttpServer;
     private SlowHttpServer slowHttpServer;
     private static SpringSecuritySaml implementation;
+    private Network mockNetwork = mock(Network.class);
 
     @BeforeClass
     public static void initializeOpenSAML() throws Exception {
-        implementation = new OpenSamlImplementation(Clock.systemUTC());
+        implementation = new OpenSamlImplementation(Clock.systemUTC()).init();
     }
 
     public static final String xmlWithoutID =
@@ -121,8 +126,14 @@ public class SamlIdentityProviderConfiguratorTests {
 
     @Before
     public void setUp() throws Exception {
-        bootstrap = new BootstrapSamlIdentityProviderData();
         configurator = new SamlIdentityProviderConfigurator();
+        configurator.setResolver(
+            new DefaultSamlObjectResolver()
+                .setTransformer(new DefaultSamlTransformer(implementation))
+                .setMetadataCache(new DefaultMetadataCache(Clock.systemUTC(), mockNetwork))
+        );
+
+        bootstrap = new BootstrapSamlIdentityProviderData();
         singleAdd = new SamlIdentityProviderDefinition()
           .setMetaDataLocation(String.format(BootstrapSamlIdentityProviderDataTests.xmlWithoutID, new RandomValueStringGenerator().generate()))
           .setIdpEntityAlias(singleAddAlias)
@@ -179,7 +190,7 @@ public class SamlIdentityProviderConfiguratorTests {
                     break;
                 }
                 case "simplesamlphp-url": {
-                    //when(fixedHttpMetaDataProvider.fetchMetadata(any(), anyBoolean())).thenReturn(getSimpleSamlPhpMetadata("http://simplesamlphp.somewhere.com").getBytes());
+                    when(mockNetwork.get(anyString(), anyBoolean())).thenReturn(getSimpleSamlPhpMetadata("http://simplesamlphp.somewhere.com").getBytes());
                     IdentityProviderMetadata provider = configurator.getExtendedMetadataDelegate(def);
                     assertEquals("http://simplesamlphp.somewhere.com/saml2/idp/metadata.php", provider.getEntityId());
                     break;

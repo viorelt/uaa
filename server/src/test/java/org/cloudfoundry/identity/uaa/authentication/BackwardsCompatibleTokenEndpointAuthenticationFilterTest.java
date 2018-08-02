@@ -15,7 +15,6 @@
 
 package org.cloudfoundry.identity.uaa.authentication;
 
-import javax.servlet.Filter;
 import javax.servlet.FilterChain;
 import java.util.Arrays;
 
@@ -48,6 +47,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
@@ -69,7 +69,6 @@ public class BackwardsCompatibleTokenEndpointAuthenticationFilterTest {
     private FilterChain chain;
     private AuthenticationEntryPoint entryPoint;
     private TokenTestSupport support;
-    private Filter samlAuthFilter;
     private SamlAssertionAuthenticationHandler samlAssertionAuthenticationHandler;
 
     @Before
@@ -77,7 +76,6 @@ public class BackwardsCompatibleTokenEndpointAuthenticationFilterTest {
 
         passwordAuthManager = mock(AuthenticationManager.class);
         requestFactory = mock(OAuth2RequestFactory.class);
-        samlAuthFilter = mock(Filter.class);
         xoAuthAuthenticationManager = mock(XOAuthAuthenticationManager.class);
         samlAssertionAuthenticationHandler = mock(SamlAssertionAuthenticationHandler.class);
         filter = spy(
@@ -126,7 +124,7 @@ public class BackwardsCompatibleTokenEndpointAuthenticationFilterTest {
         filter.doFilter(request, response, chain);
         verify(filter, times(1)).attemptTokenAuthentication(same(request), same(response));
         verify(passwordAuthManager, times(1)).authenticate(any());
-        verifyZeroInteractions(samlAuthFilter);
+        verifyZeroInteractions(samlAssertionAuthenticationHandler);
         verifyZeroInteractions(xoAuthAuthenticationManager);
     }
 
@@ -137,8 +135,11 @@ public class BackwardsCompatibleTokenEndpointAuthenticationFilterTest {
         request.addParameter("assertion", "saml-assertion-value-here");
         filter.doFilter(request, response, chain);
         verify(filter, times(1)).attemptTokenAuthentication(same(request), same(response));
-        //verify(samlAuthFilter, times(1)).attemptAuthentication(same(request), same(response));
-        verify(samlAuthFilter, times(1));
+        verify(samlAssertionAuthenticationHandler, times(1)).authenticate(
+            same(request),
+            same(response),
+            eq("saml-assertion-value-here")
+        );
         verifyZeroInteractions(passwordAuthManager);
         verifyZeroInteractions(xoAuthAuthenticationManager);
     }

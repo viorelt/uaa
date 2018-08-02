@@ -146,7 +146,8 @@ public class SamlIdentityProviderConfigurator implements InitializingBean {
         ExternalIdentityProviderConfiguration config = new ExternalIdentityProviderConfiguration()
             .setAlias(alias)
             .setMetadata(metadata)
-            .setSkipSslValidation(def.isSkipSslValidation());
+            .setSkipSslValidation(def.isSkipSslValidation())
+            .setMetadataTrustCheck(def.isMetadataTrustCheck());
 
         return resolver.resolveIdentityProvider(config);
 //        configMetadataProvider.setParserPool(getParserPool());
