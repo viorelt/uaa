@@ -31,7 +31,6 @@ import org.cloudfoundry.identity.uaa.user.UaaUserDatabase;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.saml.SamlMessageHandler;
 import org.springframework.security.saml.SamlObjectResolver;
 import org.springframework.security.saml.config.SamlServerConfiguration;
@@ -123,7 +122,7 @@ public class HostedSamlConfiguration extends AbstractProviderConfiguration {
     }
 
     @Bean(name = "samlAuthenticationProvider")
-    public AuthenticationManager samlAuthenticationManager() {
+    public LoginSamlAuthenticationProvider samlAuthenticationManager() {
         LoginSamlAuthenticationProvider result = new LoginSamlAuthenticationProvider();
         result.setUserDatabase(userDatabase);
         result.setIdentityProviderProvisioning(identityProviderProvisioning);
@@ -183,5 +182,18 @@ public class HostedSamlConfiguration extends AbstractProviderConfiguration {
         result.setDefaultFailureUrl("/saml_error");
         return result;
     }
+
+    @Bean(name = "assertionAuthenticationHandler")
+    public SamlAssertionAuthenticationHandler assertionAuthenticationHandler() {
+        return new SamlAssertionAuthenticationHandler(
+            validator(),
+            resolver(),
+            samlServerConfiguration(),
+            transformer(),
+            network(samlServerConfiguration()),
+            samlAuthenticationManager()
+        );
+    }
+
 
 }

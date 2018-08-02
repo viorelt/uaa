@@ -19,6 +19,7 @@ import javax.servlet.Filter;
 import javax.servlet.FilterChain;
 import java.util.Arrays;
 
+import org.cloudfoundry.identity.uaa.impl.config.saml.SamlAssertionAuthenticationHandler;
 import org.cloudfoundry.identity.uaa.oauth.TokenTestSupport;
 import org.cloudfoundry.identity.uaa.provider.oauth.XOAuthAuthenticationManager;
 import org.cloudfoundry.identity.uaa.provider.oauth.XOAuthCodeToken;
@@ -69,6 +70,7 @@ public class BackwardsCompatibleTokenEndpointAuthenticationFilterTest {
     private AuthenticationEntryPoint entryPoint;
     private TokenTestSupport support;
     private Filter samlAuthFilter;
+    private SamlAssertionAuthenticationHandler samlAssertionAuthenticationHandler;
 
     @Before
     public void setUp() throws Exception {
@@ -77,12 +79,13 @@ public class BackwardsCompatibleTokenEndpointAuthenticationFilterTest {
         requestFactory = mock(OAuth2RequestFactory.class);
         samlAuthFilter = mock(Filter.class);
         xoAuthAuthenticationManager = mock(XOAuthAuthenticationManager.class);
-
+        samlAssertionAuthenticationHandler = mock(SamlAssertionAuthenticationHandler.class);
         filter = spy(
             new BackwardsCompatibleTokenEndpointAuthenticationFilter(
                 passwordAuthManager,
                 requestFactory,
-                xoAuthAuthenticationManager
+                xoAuthAuthenticationManager,
+                samlAssertionAuthenticationHandler
             )
         );
 
