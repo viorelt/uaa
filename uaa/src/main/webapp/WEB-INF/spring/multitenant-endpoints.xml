@@ -206,6 +206,7 @@
     <bean id="spMetaDataProviders"
           class="org.cloudfoundry.identity.uaa.provider.saml.idp.SamlServiceProviderConfigurator">
         <property name="providerProvisioning" ref="serviceProviderProvisioning"/>
+        <property name="resolver" ref="resolver"/>
     </bean>
 
     <http name="serviceProviderSecurity" pattern="/saml/service-providers/**" create-session="stateless"
