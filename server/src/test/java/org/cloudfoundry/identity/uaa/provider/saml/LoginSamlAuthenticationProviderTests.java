@@ -16,9 +16,7 @@
 package org.cloudfoundry.identity.uaa.provider.saml;
 
 import javax.servlet.ServletContext;
-import javax.xml.namespace.QName;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -59,19 +57,6 @@ import org.joda.time.DateTime;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import org.opensaml.core.xml.schema.XSBoolean;
-import org.opensaml.core.xml.schema.XSBooleanValue;
-import org.opensaml.core.xml.schema.impl.XSAnyImpl;
-import org.opensaml.core.xml.schema.impl.XSBase64BinaryImpl;
-import org.opensaml.core.xml.schema.impl.XSBooleanBuilder;
-import org.opensaml.core.xml.schema.impl.XSBooleanImpl;
-import org.opensaml.core.xml.schema.impl.XSDateTimeImpl;
-import org.opensaml.core.xml.schema.impl.XSIntegerImpl;
-import org.opensaml.core.xml.schema.impl.XSQNameImpl;
-import org.opensaml.core.xml.schema.impl.XSURIImpl;
-import org.opensaml.security.credential.Credential;
-import org.opensaml.soap.wsaddressing.impl.AttributedURIImpl;
-import org.opensaml.soap.wssecurity.impl.AttributedStringImpl;
 import org.springframework.context.ApplicationEvent;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.IncorrectResultSizeDataAccessException;
@@ -81,15 +66,25 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
-import org.springframework.security.saml.SamlAuthentication;
+import org.springframework.security.saml.SamlObjectResolver;
 import org.springframework.security.saml.saml2.attribute.Attribute;
+import org.springframework.security.saml.saml2.attribute.AttributeNameFormat;
+import org.springframework.security.saml.saml2.authentication.Assertion;
+import org.springframework.security.saml.saml2.authentication.AuthenticationContext;
 import org.springframework.security.saml.saml2.authentication.AuthenticationContextClassReference;
+import org.springframework.security.saml.saml2.authentication.AuthenticationStatement;
+import org.springframework.security.saml.saml2.authentication.NameIdPrincipal;
+import org.springframework.security.saml.saml2.authentication.Subject;
+import org.springframework.security.saml.saml2.metadata.IdentityProviderMetadata;
+import org.springframework.security.saml.saml2.metadata.NameId;
+import org.springframework.security.saml.spi.DefaultSamlAuthentication;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.context.request.ServletWebRequest;
 
+import static java.util.Arrays.asList;
 import static org.cloudfoundry.identity.uaa.provider.ExternalIdentityProviderDefinition.EMAIL_ATTRIBUTE_NAME;
 import static org.cloudfoundry.identity.uaa.provider.ExternalIdentityProviderDefinition.FAMILY_NAME_ATTRIBUTE_NAME;
 import static org.cloudfoundry.identity.uaa.provider.ExternalIdentityProviderDefinition.GIVEN_NAME_ATTRIBUTE_NAME;
@@ -105,6 +100,7 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -137,6 +133,8 @@ public class LoginSamlAuthenticationProviderTests extends JdbcTestBase {
     private ScimGroup uaaSamlAdmin;
     private ScimGroup uaaSamlTest;
     private TimeService timeService;
+    private Assertion credential;
+    private SamlObjectResolver resolver;
 
     public List<Attribute> getAttributes(Map<String,Object> values) {
         List<Attribute> result = new LinkedList<>();
@@ -146,63 +144,42 @@ public class LoginSamlAuthenticationProviderTests extends JdbcTestBase {
         return result;
     }
     public List<Attribute> getAttributes(final String name, Object value) {
-        Attribute attribute = mock(Attribute.class);
-        when(attribute.getName()).thenReturn(name);
-        when(attribute.getFriendlyName()).thenReturn(name);
+        Attribute attribute = new Attribute()
+            .setName(name)
+            .setFriendlyName(name)
+            .setNameFormat(AttributeNameFormat.UNSPECIFIED);
 
         List<Object> xmlObjects = new LinkedList<>();
         if ("XSURI".equals(name)) {
-            XSURIImpl impl = new AttributedURIImpl("", "", "");
-            impl.setValue((String)value);
-            xmlObjects.add(impl);
+            attribute.setNameFormat(AttributeNameFormat.URI);
+            xmlObjects.add(value);
         } else if ("XSAny".equals(name)) {
-            XSAnyImpl impl = new XSAnyImpl("", "", "") {};
-            impl.setTextContent((String)value);
-            xmlObjects.add(impl);
+            xmlObjects.add(value);
         } else if ("XSQName".equals(name)) {
-            XSQNameImpl impl = new XSQNameImpl("", "", "") {};
-            impl.setValue(new QName("", (String)value));
-            xmlObjects.add(impl);
+            xmlObjects.add(value);
         } else if ("XSInteger".equals(name)) {
-            XSIntegerImpl impl = new XSIntegerImpl("", "", ""){};
-            impl.setValue((Integer)value);
-            xmlObjects.add(impl);
+            xmlObjects.add(value);
         } else if ("XSBoolean".equals(name)) {
-            XSBooleanImpl impl = new XSBooleanImpl("", "", ""){};
-            impl.setValue(new XSBooleanValue((Boolean)value, false));
-            xmlObjects.add(impl);
+            xmlObjects.add(value);
         } else if ("XSDateTime".equals(name)) {
-            XSDateTimeImpl impl = new XSDateTimeImpl("", "", ""){};
-            impl.setValue((DateTime)value);
-            xmlObjects.add(impl);
+            xmlObjects.add(value);
         } else if ("XSBase64Binary".equals(name)) {
-            XSBase64BinaryImpl impl = new XSBase64BinaryImpl("", "", ""){};
-            impl.setValue((String)value);
-            xmlObjects.add(impl);
+            xmlObjects.add(value);
         } else if (value instanceof List) {
             for (String s : (List<String>) value) {
                 if (SAML_USER.equals(s)) {
-                    XSAnyImpl impl = new XSAnyImpl("", "", "") {
-                    };
-                    impl.setTextContent(s);
-                    xmlObjects.add(impl);
+                    xmlObjects.add(s);
                 } else {
-                    AttributedStringImpl impl = new AttributedStringImpl("", "", "");
-                    impl.setValue(s);
-                    xmlObjects.add(impl);
+                    xmlObjects.add(s);
                 }
             }
         } else if (value instanceof Boolean) {
-            XSBoolean impl = new XSBooleanBuilder().buildObject("", "", "");
-            impl.setValue(new XSBooleanValue((Boolean)value, false));
-            xmlObjects.add(impl);
+            xmlObjects.add(value);
         } else {
-            AttributedStringImpl impl = new AttributedStringImpl("", "", "");
-            impl.setValue((String)value);
-            xmlObjects.add(impl);
+            xmlObjects.add(value);
         }
-        when(attribute.getValues()).thenReturn(xmlObjects);
-        return Arrays.asList(attribute);
+        attribute.setValues(xmlObjects);
+        return asList(attribute);
     }
 
     @Before
@@ -214,12 +191,11 @@ public class LoginSamlAuthenticationProviderTests extends JdbcTestBase {
         RequestContextHolder.setRequestAttributes(servletWebRequest);
 
         ScimGroupProvisioning groupProvisioning = new JdbcScimGroupProvisioning(jdbcTemplate, new JdbcPagingListFactory(jdbcTemplate, limitSqlAdapter));
-        IdentityZoneHolder.get().getConfig().getUserConfig().setDefaultGroups(Arrays.asList("uaa.user"));
+        IdentityZoneHolder.get().getConfig().getUserConfig().setDefaultGroups(asList("uaa.user"));
         groupProvisioning.createOrGet(new ScimGroup(null, "uaa.user", IdentityZoneHolder.get().getId()), IdentityZoneHolder.get().getId());
         providerDefinition = new SamlIdentityProviderDefinition();
 
         userProvisioning = new JdbcScimUserProvisioning(jdbcTemplate, new JdbcPagingListFactory(jdbcTemplate, limitSqlAdapter));
-
 
         uaaSamlUser = groupProvisioning.create(new ScimGroup(null,UAA_SAML_USER, IdentityZone.getUaa().getId()), IdentityZoneHolder.get().getId());
         uaaSamlAdmin = groupProvisioning.create(new ScimGroup(null,UAA_SAML_ADMIN, IdentityZone.getUaa().getId()), IdentityZoneHolder.get().getId());
@@ -236,23 +212,26 @@ public class LoginSamlAuthenticationProviderTests extends JdbcTestBase {
         externalManager.mapExternalGroup(uaaSamlAdmin.getId(), SAML_ADMIN, OriginKeys.SAML, IdentityZoneHolder.get().getId());
         externalManager.mapExternalGroup(uaaSamlTest.getId(), SAML_TEST, OriginKeys.SAML, IdentityZoneHolder.get().getId());
 
-        Credential credential = getUserCredential("marissa-saml", "Marissa", "Bloggs", "marissa.bloggs@test.com", "1234567890");
+        credential = getUserCredential("marissa-saml", "Marissa", "Bloggs", "marissa.bloggs@test.com", "1234567890");
         Map<String, Object> attributes = new HashMap<>();
         attributes.put("firstName", "Marissa");
         attributes.put("lastName", "Bloggs");
         attributes.put("emailAddress", "marissa.bloggs@test.com");
         attributes.put("phone", "1234567890");
-        attributes.put("groups", Arrays.asList(SAML_USER,SAML_ADMIN,SAML_NOT_MAPPED));
-        attributes.put("2ndgroups", Arrays.asList(SAML_TEST));
-
-        //when(consumer.processAuthenticationResponse(anyObject())).thenReturn(credential);
+        attributes.put("groups", asList(SAML_USER,SAML_ADMIN,SAML_NOT_MAPPED));
+        attributes.put("2ndgroups", asList(SAML_TEST));
 
         timeService = mock(TimeService.class);
         userDatabase = new JdbcUaaUserDatabase(jdbcTemplate, timeService);
         providerProvisioning = new JdbcIdentityProviderProvisioning(jdbcTemplate);
         publisher = new CreateUserPublisher(bootstrap);
-        authprovider = new LoginSamlAuthenticationProvider();
 
+        resolver = mock(SamlObjectResolver.class);
+        IdentityProviderMetadata idpm = new IdentityProviderMetadata().setEntityAlias(OriginKeys.SAML);
+        when(resolver.resolveIdentityProvider(anyString())).thenReturn(idpm);
+
+        authprovider = new LoginSamlAuthenticationProvider();
+        authprovider.setResolver(resolver);
         authprovider.setUserDatabase(userDatabase);
         authprovider.setIdentityProviderProvisioning(providerProvisioning);
         authprovider.setApplicationEventPublisher(publisher);
@@ -270,7 +249,7 @@ public class LoginSamlAuthenticationProviderTests extends JdbcTestBase {
         provider = providerProvisioning.create(provider, IdentityZoneHolder.get().getId());
     }
 
-    private Credential getUserCredential(String username, String firstName, String lastName, String emailAddress, String phoneNumber) {
+    private Assertion getUserCredential(String username, String firstName, String lastName, String emailAddress, String phoneNumber) {
         return getUserCredential(username,
                                  firstName,
                                  lastName,
@@ -278,7 +257,7 @@ public class LoginSamlAuthenticationProviderTests extends JdbcTestBase {
                                  phoneNumber,
                                  null);
     }
-    private Credential getUserCredential(String username,
+    private Assertion getUserCredential(String username,
                                              String firstName,
                                              String lastName,
                                              String emailAddress,
@@ -292,10 +271,10 @@ public class LoginSamlAuthenticationProviderTests extends JdbcTestBase {
         attributes.put("lastName", lastName);
         attributes.put("emailAddress", emailAddress);
         attributes.put("phone", phoneNumber);
-        attributes.put("groups", Arrays.asList(SAML_USER, SAML_ADMIN, SAML_NOT_MAPPED));
-        attributes.put("2ndgroups", Arrays.asList(SAML_TEST));
-        attributes.put(COST_CENTER, Arrays.asList(DENVER_CO));
-        attributes.put(MANAGER, Arrays.asList(JOHN_THE_SLOTH, KARI_THE_ANT_EATER));
+        attributes.put("groups", asList(SAML_USER, SAML_ADMIN, SAML_NOT_MAPPED));
+        attributes.put("2ndgroups", asList(SAML_TEST));
+        attributes.put(COST_CENTER, asList(DENVER_CO));
+        attributes.put(MANAGER, asList(JOHN_THE_SLOTH, KARI_THE_ANT_EATER));
         if (emailVerified!=null) {
             attributes.put("emailVerified", emailVerified);
         }
@@ -328,7 +307,27 @@ public class LoginSamlAuthenticationProviderTests extends JdbcTestBase {
 //            "remoteEntityID",
 //            getAttributes(attributes),
 //            "localEntityID");
-        throw new UnsupportedOperationException();
+
+        Assertion assertion = new Assertion()
+            .setIssuer("remoteEntityID")
+            .setSubject(
+                new Subject().setPrincipal(
+                    new NameIdPrincipal()
+                        .setFormat(NameId.PERSISTENT)
+                        .setValue(username)
+                )
+            )
+            .setAuthenticationStatements(
+                asList(
+                    new AuthenticationStatement()
+                        .setAuthenticationContext(
+                            new AuthenticationContext()
+                                .setClassReference(AuthenticationContextClassReference.PASSWORD)
+                        )
+                )
+            )
+            .setAttributes(getAttributes(attributes));
+        return assertion;
     }
 
     @After
@@ -338,19 +337,19 @@ public class LoginSamlAuthenticationProviderTests extends JdbcTestBase {
 
     @Test
     public void testAuthenticateSimple() {
-        authprovider.authenticate(mockSamlAuthentication(OriginKeys.SAML));
+        performAuthentication(credential);
     }
 
     @Test
     public void testAuthenticationEvents() {
-        authprovider.authenticate(mockSamlAuthentication(OriginKeys.SAML));
+        performAuthentication(credential);
         assertEquals(3, publisher.events.size());
         assertTrue(publisher.events.get(2) instanceof IdentityProviderAuthenticationSuccessEvent);
     }
 
     @Test
     public void relay_sets_attribute() {
-        for (String url : Arrays.asList("test", "www.google.com", null)) {
+        for (String url : asList("test", "www.google.com", null)) {
             authprovider.configureRelayRedirect(url);
             assertNull(RequestContextHolder.currentRequestAttributes().getAttribute(UaaSavedRequestAwareAuthenticationSuccessHandler.URI_OVERRIDE_ATTRIBUTE, RequestAttributes.SCOPE_REQUEST));
         }
@@ -359,41 +358,32 @@ public class LoginSamlAuthenticationProviderTests extends JdbcTestBase {
     @Test
     public void test_relay_state_when_url() {
         String redirectUrl = "https://www.cloudfoundry.org";
-        SamlAuthentication samlAuthenticationToken = mockSamlAuthentication(OriginKeys.SAML);
-        throw new UnsupportedOperationException();
-        //when(samlAuthenticationToken.getCredentials().getRelayState()).thenReturn(redirectUrl);
-//        Authentication authentication = authprovider.authenticate(samlAuthenticationToken);
-//        assertNotNull("Authentication cannot be null", authentication);
-//        assertTrue("Authentication should be of type:"+UaaAuthentication.class.getName(), authentication instanceof UaaAuthentication);
-//        UaaAuthentication uaaAuthentication = (UaaAuthentication)authentication;
-//        assertThat(uaaAuthentication.getAuthContextClassRef(),containsInAnyOrder(AuthnContext.PASSWORD_AUTHN_CTX));
-//        SAMLMessageContext context = samlAuthenticationToken.getCredentials();
-//        verify(context, times(1)).getRelayState();
-//        assertEquals(redirectUrl, RequestContextHolder.currentRequestAttributes().getAttribute(UaaSavedRequestAwareAuthenticationSuccessHandler.URI_OVERRIDE_ATTRIBUTE, RequestAttributes.SCOPE_REQUEST));
-    }
+        Authentication authentication = performAuthentication(credential, redirectUrl);
 
-    @Test
-    public void saml_authentication_contains_acr() {
-        SamlAuthentication samlAuthenticationToken = mockSamlAuthentication(OriginKeys.SAML);
-        Authentication authentication = authprovider.authenticate(samlAuthenticationToken);
         assertNotNull("Authentication cannot be null", authentication);
         assertTrue("Authentication should be of type:"+UaaAuthentication.class.getName(), authentication instanceof UaaAuthentication);
         UaaAuthentication uaaAuthentication = (UaaAuthentication)authentication;
         assertThat(uaaAuthentication.getAuthContextClassRef(),containsInAnyOrder(AuthenticationContextClassReference.PASSWORD.toString()));
+        assertEquals(redirectUrl, RequestContextHolder.currentRequestAttributes().getAttribute(UaaSavedRequestAwareAuthenticationSuccessHandler.URI_OVERRIDE_ATTRIBUTE, RequestAttributes.SCOPE_REQUEST));
+    }
 
-//        SAMLMessageContext context = samlAuthenticationToken.getCredentials();
-//        verify(context, times(1)).getRelayState();
+    @Test
+    public void saml_authentication_contains_acr() {
+        Authentication authentication = performAuthentication(credential);
+        assertNotNull("Authentication cannot be null", authentication);
+        assertTrue("Authentication should be of type:"+UaaAuthentication.class.getName(), authentication instanceof UaaAuthentication);
+        UaaAuthentication uaaAuthentication = (UaaAuthentication)authentication;
+        assertThat(uaaAuthentication.getAuthContextClassRef(),containsInAnyOrder(AuthenticationContextClassReference.PASSWORD.toString()));
         assertNull(RequestContextHolder.currentRequestAttributes().getAttribute(UaaSavedRequestAwareAuthenticationSuccessHandler.URI_OVERRIDE_ATTRIBUTE, RequestAttributes.SCOPE_REQUEST));
-        throw new UnsupportedOperationException();
     }
 
 
     @Test
     public void test_multiple_group_attributes() throws Exception {
-        providerDefinition.addAttributeMapping(GROUP_ATTRIBUTE_NAME, Arrays.asList("2ndgroups", "groups"));
+        providerDefinition.addAttributeMapping(GROUP_ATTRIBUTE_NAME, asList("2ndgroups", "groups"));
         provider.setConfig(providerDefinition);
         providerProvisioning.update(provider, IdentityZoneHolder.get().getId());
-        UaaAuthentication authentication = getAuthentication();
+        UaaAuthentication authentication = performAuthentication(credential);
         assertEquals("Four authorities should have been granted!", 4, authentication.getAuthorities().size());
         assertThat(authentication.getAuthorities(),
                    containsInAnyOrder(
@@ -407,17 +397,17 @@ public class LoginSamlAuthenticationProviderTests extends JdbcTestBase {
 
     @Test
     public void authenticationContainsAmr() throws Exception {
-        UaaAuthentication authentication = getAuthentication();
+        UaaAuthentication authentication = performAuthentication(credential);
         assertThat(authentication.getAuthenticationMethods(), containsInAnyOrder("ext"));
     }
 
     @Test
     public void test_external_groups_as_scopes() throws Exception {
         providerDefinition.setGroupMappingMode(SamlIdentityProviderDefinition.ExternalGroupMappingMode.AS_SCOPES);
-        providerDefinition.addAttributeMapping(GROUP_ATTRIBUTE_NAME, Arrays.asList("2ndgroups", "groups"));
+        providerDefinition.addAttributeMapping(GROUP_ATTRIBUTE_NAME, asList("2ndgroups", "groups"));
         provider.setConfig(providerDefinition);
         providerProvisioning.update(provider, IdentityZoneHolder.get().getId());
-        UaaAuthentication authentication = getAuthentication();
+        UaaAuthentication authentication = performAuthentication(credential);
         assertThat(authentication.getAuthorities(),
                 containsInAnyOrder(
                         new SimpleGrantedAuthority(SAML_ADMIN),
@@ -434,7 +424,7 @@ public class LoginSamlAuthenticationProviderTests extends JdbcTestBase {
         providerDefinition.addAttributeMapping(GROUP_ATTRIBUTE_NAME, "groups");
         provider.setConfig(providerDefinition);
         providerProvisioning.update(provider, IdentityZoneHolder.get().getId());
-        UaaAuthentication authentication = getAuthentication();
+        UaaAuthentication authentication = performAuthentication(credential);
         assertEquals("Three authorities should have been granted!", 3, authentication.getAuthorities().size());
         assertThat(authentication.getAuthorities(),
                    containsInAnyOrder(
@@ -457,7 +447,7 @@ public class LoginSamlAuthenticationProviderTests extends JdbcTestBase {
 
         provider.setConfig(providerDefinition);
         providerProvisioning.update(provider, IdentityZoneHolder.get().getId());
-        UaaAuthentication authentication = getAuthentication();
+        UaaAuthentication authentication = performAuthentication(credential);
         assertEquals("http://localhost:8080/someuri", authentication.getUserAttributes().getFirst("XSURI"));
         assertEquals("XSAnyValue", authentication.getUserAttributes().getFirst("XSAny"));
         assertEquals("XSQNameValue", authentication.getUserAttributes().getFirst("XSQName"));
@@ -476,7 +466,7 @@ public class LoginSamlAuthenticationProviderTests extends JdbcTestBase {
             providerDefinition.addAttributeMapping(GROUP_ATTRIBUTE_NAME, "groups");
             provider.setConfig(providerDefinition);
             providerProvisioning.update(provider, IdentityZoneHolder.get().getId());
-            UaaAuthentication authentication = getAuthentication();
+            UaaAuthentication authentication = performAuthentication(credential);
             assertEquals("Three authorities should have been granted!", 1, authentication.getAuthorities().size());
             assertThat(authentication.getAuthorities(),
                     not(containsInAnyOrder(
@@ -492,7 +482,7 @@ public class LoginSamlAuthenticationProviderTests extends JdbcTestBase {
 
     @Test
     public void test_group_attribute_not_set() throws Exception {
-        UaaAuthentication uaaAuthentication = getAuthentication();
+        UaaAuthentication uaaAuthentication = performAuthentication(credential);
         assertEquals("Only uaa.user should have been granted", 1, uaaAuthentication.getAuthorities().size());
         assertEquals(UaaAuthority.UAA_USER.getAuthority(), uaaAuthentication.getAuthorities().iterator().next().getAuthority());
     }
@@ -503,7 +493,7 @@ public class LoginSamlAuthenticationProviderTests extends JdbcTestBase {
         provider.setConfig(providerDefinition);
         providerProvisioning.update(provider, IdentityZoneHolder.get().getId());
 
-        UaaAuthentication authentication = getAuthentication();
+        UaaAuthentication authentication = performAuthentication(credential);
         assertEquals(Collections.EMPTY_SET, authentication.getExternalGroups());
     }
 
@@ -514,7 +504,7 @@ public class LoginSamlAuthenticationProviderTests extends JdbcTestBase {
         provider.setConfig(providerDefinition);
         providerProvisioning.update(provider, IdentityZoneHolder.get().getId());
 
-        UaaAuthentication authentication = getAuthentication();
+        UaaAuthentication authentication = performAuthentication(credential);
         assertEquals(Collections.singleton(SAML_ADMIN), authentication.getExternalGroups());
     }
 
@@ -524,7 +514,7 @@ public class LoginSamlAuthenticationProviderTests extends JdbcTestBase {
         providerDefinition.addWhiteListedGroup("saml*");
         provider.setConfig(providerDefinition);
         providerProvisioning.update(provider, IdentityZoneHolder.get().getId());
-        UaaAuthentication authentication = getAuthentication();
+        UaaAuthentication authentication = performAuthentication(credential);
         assertThat(authentication.getExternalGroups(), containsInAnyOrder(SAML_USER, SAML_ADMIN, SAML_NOT_MAPPED));
     }
 
@@ -532,9 +522,9 @@ public class LoginSamlAuthenticationProviderTests extends JdbcTestBase {
     public void update_invitedUser_whose_username_is_notEmail() throws Exception {
         ScimUser scimUser = getInvitedUser();
 
-        Credential credential = getUserCredential("marissa-invited", "Marissa-invited", null, "marissa.invited@test.org", null);
+        Assertion credential = getUserCredential("marissa-invited", "Marissa-invited", null, "marissa.invited@test.org", null);
         //when(consumer.processAuthenticationResponse(anyObject())).thenReturn(credential);
-        getAuthentication();
+        performAuthentication(credential);
 
         UaaUser user = userDatabase.retrieveUserById(scimUser.getId());
         assertFalse(user.isVerified());
@@ -554,10 +544,9 @@ public class LoginSamlAuthenticationProviderTests extends JdbcTestBase {
 
         ScimUser scimUser = getInvitedUser();
 
-        Credential credential = getUserCredential("marissa-invited", "Marissa-invited", null, "different@test.org", null);
-//        when(consumer.processAuthenticationResponse(anyObject())).thenReturn(credential);
+        credential = getUserCredential("marissa-invited", "Marissa-invited", null, "different@test.org", null);
         try {
-            getAuthentication();
+            performAuthentication(credential);
             fail();
         } catch (BadCredentialsException e) {
             UaaUser user = userDatabase.retrieveUserById(scimUser.getId());
@@ -589,7 +578,7 @@ public class LoginSamlAuthenticationProviderTests extends JdbcTestBase {
             fail("user should not exist");
         } catch (UsernameNotFoundException x) {
         }
-        getAuthentication();
+        performAuthentication(credential);
         UaaUser user = userDatabase.retrieveUserByName("marissa-saml", OriginKeys.SAML);
         assertFalse(user.isVerified());
         Map<String,Object> attributeMappings = new HashMap<>();
@@ -600,9 +589,8 @@ public class LoginSamlAuthenticationProviderTests extends JdbcTestBase {
         provider.setConfig(providerDefinition);
         providerProvisioning.update(provider, IdentityZoneHolder.get().getId());
 
-        Credential credential = getUserCredential("marissa-saml", "Marissa-changed", null, "marissa.bloggs@change.org", null);
-//        when(consumer.processAuthenticationResponse(anyObject())).thenReturn(credential);
-        getAuthentication();
+        credential = getUserCredential("marissa-saml", "Marissa-changed", null, "marissa.bloggs@change.org", null);
+        performAuthentication(credential);
 
         user = userDatabase.retrieveUserByName("marissa-saml", OriginKeys.SAML);
         assertEquals("Marissa-changed", user.getGivenName());
@@ -610,8 +598,7 @@ public class LoginSamlAuthenticationProviderTests extends JdbcTestBase {
         assertFalse(user.isVerified());
 
         credential = getUserCredential("marissa-saml", "Marissa-changed", null, "marissa.bloggs@change.org", null, true);
-//        when(consumer.processAuthenticationResponse(anyObject())).thenReturn(credential);
-        getAuthentication();
+        performAuthentication(credential);
 
         user = userDatabase.retrieveUserByName("marissa-saml", OriginKeys.SAML);
         assertEquals("Marissa-changed", user.getGivenName());
@@ -630,7 +617,7 @@ public class LoginSamlAuthenticationProviderTests extends JdbcTestBase {
         provider.setConfig(providerDefinition);
         providerProvisioning.update(provider, IdentityZoneHolder.get().getId());
 
-        getAuthentication();
+        performAuthentication(credential);
 
         UaaUser originalUser = userDatabase.retrieveUserByEmail("marissa.bloggs@test.com", OriginKeys.SAML);
         assertNotNull(originalUser);
@@ -651,10 +638,10 @@ public class LoginSamlAuthenticationProviderTests extends JdbcTestBase {
 
     @Test
     public void dont_update_existingUser_if_attributes_areTheSame() throws Exception {
-        getAuthentication();
+        performAuthentication(credential);
         UaaUser user = userDatabase.retrieveUserByName("marissa-saml", OriginKeys.SAML);
 
-        getAuthentication();
+        performAuthentication(credential);
         UaaUser existingUser = userDatabase.retrieveUserByName("marissa-saml", OriginKeys.SAML);
 
         assertEquals(existingUser.getModified(), user.getModified());
@@ -662,7 +649,7 @@ public class LoginSamlAuthenticationProviderTests extends JdbcTestBase {
 
     @Test
     public void have_attributes_changed() throws Exception {
-        getAuthentication();
+        performAuthentication(credential);
         UaaUser existing = userDatabase.retrieveUserByName("marissa-saml", OriginKeys.SAML);
         UaaUser modified = new UaaUser(new UaaUserPrototype(existing));
         assertFalse("Nothing modified", authprovider.haveUserAttributesChanged(existing, modified));
@@ -690,7 +677,7 @@ public class LoginSamlAuthenticationProviderTests extends JdbcTestBase {
         provider.setConfig(providerDefinition);
         providerProvisioning.update(provider, IdentityZoneHolder.get().getId());
 
-        getAuthentication();
+        performAuthentication(credential);
         UaaUser user = userDatabase.retrieveUserByName("marissa-saml", OriginKeys.SAML);
         assertEquals("Marissa", user.getGivenName());
         assertEquals("Bloggs", user.getFamilyName());
@@ -711,7 +698,7 @@ public class LoginSamlAuthenticationProviderTests extends JdbcTestBase {
         provider.setConfig(providerDefinition);
         provider = providerProvisioning.update(provider, IdentityZoneHolder.get().getId());
 
-        UaaAuthentication authentication = getAuthentication();
+        UaaAuthentication authentication = performAuthentication(credential);
         UaaUser user = userDatabase.retrieveUserByName("marissa-saml", OriginKeys.SAML);
         assertEquals("Marissa", user.getGivenName());
         assertEquals("Bloggs", user.getFamilyName());
@@ -727,7 +714,7 @@ public class LoginSamlAuthenticationProviderTests extends JdbcTestBase {
         providerDefinition.setStoreCustomAttributes(true);
         provider.setConfig(providerDefinition);
         provider = providerProvisioning.update(provider, IdentityZoneHolder.get().getId());
-        authentication = getAuthentication();
+        authentication = performAuthentication(credential);
         assertEquals("marissa.bloggs@test.com", authentication.getUserAttributes().getFirst("secondary_email"));
         userInfo = userDatabase.getUserInfo(user.getId());
         assertNotNull(userInfo);
@@ -739,12 +726,12 @@ public class LoginSamlAuthenticationProviderTests extends JdbcTestBase {
 
     @Test
     public void authnContext_isvalidated_fail() throws Exception {
-        providerDefinition.setAuthnContext(Arrays.asList("some-context", "another-context"));
+        providerDefinition.setAuthnContext(asList("some-context", "another-context"));
         provider.setConfig(providerDefinition);
         providerProvisioning.update(provider, IdentityZoneHolder.get().getId());
 
         try {
-            getAuthentication();
+            performAuthentication(credential);
             fail("Expected authentication to throw BadCredentialsException");
         } catch (BadCredentialsException ex) {
 
@@ -753,12 +740,12 @@ public class LoginSamlAuthenticationProviderTests extends JdbcTestBase {
 
     @Test
     public void authnContext_isvalidated_good() throws Exception {
-        providerDefinition.setAuthnContext(Arrays.asList(AuthenticationContextClassReference.PASSWORD.toString()));
+        providerDefinition.setAuthnContext(asList(AuthenticationContextClassReference.PASSWORD.toString()));
         provider.setConfig(providerDefinition);
         providerProvisioning.update(provider, IdentityZoneHolder.get().getId());
 
         try {
-            getAuthentication();
+            performAuthentication(credential);
         } catch (BadCredentialsException ex) {
             fail("Expected authentication to succeed");
         }
@@ -777,7 +764,7 @@ public class LoginSamlAuthenticationProviderTests extends JdbcTestBase {
         providerProvisioning.update(provider, IdentityZoneHolder.get().getId());
 
         try {
-            getAuthentication();
+            performAuthentication(credential);
             fail("Expected authentication to throw LoginSAMLException");
         } catch (LoginSAMLException ex) {
 
@@ -801,7 +788,7 @@ public class LoginSamlAuthenticationProviderTests extends JdbcTestBase {
 
         ScimUser createdUser = createSamlUser("marissa.bloggs@test.com", "marissa.bloggs@test.com", "Marissa", "Bloggs");
 
-        getAuthentication();
+        performAuthentication(credential);
 
         UaaUser uaaUser = userDatabase.retrieveUserByName("marissa-saml", OriginKeys.SAML);
         assertEquals(createdUser.getId(), uaaUser.getId());
@@ -819,7 +806,7 @@ public class LoginSamlAuthenticationProviderTests extends JdbcTestBase {
         createSamlUser("marissa.bloggs@test.com", "marissa.bloggs@test.com", "Marissa", "Bloggs");
         createSamlUser("marissa.bloggs", "marissa.bloggs@test.com", "Marissa", "Bloggs");
 
-        getAuthentication();
+        performAuthentication(credential);
     }
 
     private ScimUser createSamlUser(String username, String email, String givenName, String familyName) {
@@ -838,7 +825,7 @@ public class LoginSamlAuthenticationProviderTests extends JdbcTestBase {
         provider.setConfig(providerDefinition);
         providerProvisioning.update(provider, IdentityZoneHolder.get().getId());
 
-        UaaAuthentication authentication = getAuthentication();
+        UaaAuthentication authentication = performAuthentication(credential);
         UaaUser user = userDatabase.retrieveUserByName("marissa-saml", OriginKeys.SAML);
         assertEquals("marissa.bloggs", user.getGivenName());
         assertEquals("test.com", user.getFamilyName());
@@ -860,7 +847,7 @@ public class LoginSamlAuthenticationProviderTests extends JdbcTestBase {
         provider.setConfig(providerDefinition);
         providerProvisioning.update(provider, IdentityZoneHolder.get().getId());
 
-        UaaAuthentication authentication = getAuthentication();
+        UaaAuthentication authentication = performAuthentication(credential);
 
         assertEquals("Expected two user attributes", 2, authentication.getUserAttributes().size());
         assertNotNull("Expected cost center attribute", authentication.getUserAttributes().get(COST_CENTERS));
@@ -871,23 +858,22 @@ public class LoginSamlAuthenticationProviderTests extends JdbcTestBase {
         assertThat(authentication.getUserAttributes().get(MANAGERS), containsInAnyOrder(JOHN_THE_SLOTH, KARI_THE_ANT_EATER));
     }
 
-    protected UaaAuthentication getAuthentication() {
-        SamlAuthentication authentication1 = mockSamlAuthentication(OriginKeys.SAML);
-        Authentication authentication = authprovider.authenticate(authentication1);
+    protected UaaAuthentication performAuthentication(Assertion assertion) {
+        return performAuthentication(assertion, null);
+    }
+    protected UaaAuthentication performAuthentication(Assertion assertion, String relay) {
+        DefaultSamlAuthentication samlAuth = new DefaultSamlAuthentication(
+            false,
+            assertion,
+            assertion.getIssuer().getValue(),
+            null,
+            relay
+        );
+
+        Authentication authentication = authprovider.authenticate(samlAuth);
         assertNotNull("Authentication should exist", authentication);
         assertTrue("Authentication should be UaaAuthentication", authentication instanceof UaaAuthentication);
         return (UaaAuthentication)authentication;
-    }
-
-    protected SamlAuthentication mockSamlAuthentication(String originKey) {
-//        ExtendedMetadata metadata = mock(ExtendedMetadata.class);
-//        when(metadata.getAlias()).thenReturn(originKey);
-//        SAMLMessageContext contxt = mock(SAMLMessageContext.class);
-//
-//        when(contxt.getPeerExtendedMetadata()).thenReturn(metadata);
-//        when(contxt.getCommunicationProfileId()).thenReturn(SAMLConstants.SAML2_WEBSSO_PROFILE_URI);
-//        return new SAMLAuthenticationToken(contxt);
-        throw new UnsupportedOperationException();
     }
 
     public static class CreateUserPublisher implements ApplicationEventPublisher {
