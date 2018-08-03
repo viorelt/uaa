@@ -39,6 +39,7 @@ import org.springframework.security.saml.saml2.metadata.IdentityProviderMetadata
 import org.springframework.security.saml.spi.DefaultMetadataCache;
 import org.springframework.security.saml.spi.DefaultSamlObjectResolver;
 import org.springframework.security.saml.spi.DefaultSamlTransformer;
+import org.springframework.security.saml.spi.SamlMetadataException;
 import org.springframework.security.saml.spi.SpringSecuritySaml;
 import org.springframework.security.saml.spi.opensaml.OpenSamlImplementation;
 import org.springframework.security.saml.util.Network;
@@ -50,14 +51,16 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Matchers.anyString;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
 public class SamlIdentityProviderConfiguratorTests {
 
     private SlowHttpServer slowHttpServer;
     private static SpringSecuritySaml implementation;
-    private Network mockNetwork = mock(Network.class);
+    private Network mockNetwork = spy(new Network());
 
     @BeforeClass
     public static void initializeOpenSAML() throws Exception {
@@ -190,7 +193,8 @@ public class SamlIdentityProviderConfiguratorTests {
                     break;
                 }
                 case "simplesamlphp-url": {
-                    when(mockNetwork.get(anyString(), anyBoolean())).thenReturn(getSimpleSamlPhpMetadata("http://simplesamlphp.somewhere.com").getBytes());
+                    doReturn(getSimpleSamlPhpMetadata("http://simplesamlphp.somewhere.com").getBytes())
+                        .when(mockNetwork).get(anyString(), anyBoolean());
                     IdentityProviderMetadata provider = configurator.getExtendedMetadataDelegate(def);
                     assertEquals("http://simplesamlphp.somewhere.com/saml2/idp/metadata.php", provider.getEntityId());
                     break;
@@ -277,9 +281,10 @@ public class SamlIdentityProviderConfiguratorTests {
     @Test(timeout = 1_000)
     public void shouldTimeoutWhenFetchingMetadataURL() throws Exception {
         slowHttpServer.run();
-
-        expectedException.expect(NullPointerException.class);
-
+        expectedException.expect(SamlMetadataException.class);
+        mockNetwork
+            .setReadTimeoutMillis(100)
+            .setConnectTimeoutMillis(100);
         SamlIdentityProviderDefinition def = new SamlIdentityProviderDefinition();
         def.setMetaDataLocation("https://localhost:23439");
         def.setSkipSslValidation(true);
