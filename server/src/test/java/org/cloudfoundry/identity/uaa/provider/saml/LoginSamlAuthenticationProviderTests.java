@@ -16,6 +16,7 @@
 package org.cloudfoundry.identity.uaa.provider.saml;
 
 import javax.servlet.ServletContext;
+import javax.servlet.http.HttpServletRequest;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -66,7 +67,8 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
-import org.springframework.security.saml.SamlObjectResolver;
+import org.springframework.security.saml.provider.provisioning.SamlProviderProvisioning;
+import org.springframework.security.saml.provider.service.ServiceProviderService;
 import org.springframework.security.saml.saml2.attribute.Attribute;
 import org.springframework.security.saml.saml2.attribute.AttributeNameFormat;
 import org.springframework.security.saml.saml2.authentication.Assertion;
@@ -100,6 +102,7 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -134,7 +137,7 @@ public class LoginSamlAuthenticationProviderTests extends JdbcTestBase {
     private ScimGroup uaaSamlTest;
     private TimeService timeService;
     private Assertion credential;
-    private SamlObjectResolver resolver;
+    private SamlProviderProvisioning<ServiceProviderService> resolver;
 
     public List<Attribute> getAttributes(Map<String,Object> values) {
         List<Attribute> result = new LinkedList<>();
@@ -226,9 +229,11 @@ public class LoginSamlAuthenticationProviderTests extends JdbcTestBase {
         providerProvisioning = new JdbcIdentityProviderProvisioning(jdbcTemplate);
         publisher = new CreateUserPublisher(bootstrap);
 
-        resolver = mock(SamlObjectResolver.class);
+        resolver = (SamlProviderProvisioning<ServiceProviderService>)mock(SamlProviderProvisioning.class);
+        ServiceProviderService spService = mock(ServiceProviderService.class);
+        when(resolver.getHostedProvider(any(HttpServletRequest.class))).thenReturn(spService);
         IdentityProviderMetadata idpm = new IdentityProviderMetadata().setEntityAlias(OriginKeys.SAML);
-        when(resolver.resolveIdentityProvider(anyString())).thenReturn(idpm);
+        when(spService.getRemoteProvider(anyString())).thenReturn(idpm);
 
         authprovider = new LoginSamlAuthenticationProvider();
         authprovider.setResolver(resolver);

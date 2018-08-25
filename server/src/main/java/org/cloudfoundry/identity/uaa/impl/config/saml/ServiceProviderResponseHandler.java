@@ -19,14 +19,17 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.springframework.security.authentication.AuthenticationServiceException;
 import org.springframework.security.core.AuthenticationException;
-import org.springframework.security.saml.spi.DefaultSpResponseHandler;
 import org.springframework.security.web.WebAttributes;
 
-public class ServiceProviderResponseHandler extends DefaultSpResponseHandler {
-    @Override
-    protected ProcessingStatus handleError(Exception exception, HttpServletRequest request, HttpServletResponse response) {
+public class ServiceProviderResponseHandler  {
+
+    private static Log logger = LogFactory.getLog(ServiceProviderResponseHandler.class);
+
+    protected Object handleError(Exception exception, HttpServletRequest request, HttpServletResponse response) {
         String message = getErrorMessage(exception);
         AuthenticationException auth = new AuthenticationServiceException(message, exception);
         request.getSession().setAttribute(WebAttributes.AUTHENTICATION_EXCEPTION, auth);
@@ -39,6 +42,10 @@ public class ServiceProviderResponseHandler extends DefaultSpResponseHandler {
             logger.debug("Unable to forward to saml error page", e);
             throw auth;
         }
-        return ProcessingStatus.STOP;
+        return null;
+    }
+
+    private String getErrorMessage(Exception exception) {
+        return exception.getMessage();
     }
 }

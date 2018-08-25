@@ -22,7 +22,6 @@ import org.springframework.security.saml.saml2.authentication.AuthenticationRequ
 import org.springframework.security.saml.saml2.metadata.IdentityProviderMetadata;
 import org.springframework.security.saml.saml2.metadata.NameId;
 import org.springframework.security.saml.saml2.metadata.ServiceProviderMetadata;
-import org.springframework.security.saml.spi.SamlDefaults;
 import org.springframework.security.saml.spi.SpringSecuritySaml;
 import org.springframework.security.saml.spi.opensaml.OpenSamlImplementation;
 import org.springframework.security.saml.util.Network;
@@ -37,23 +36,36 @@ public class SamlTestData {
     private final String spBaseUrl;
     private Clock time = Clock.systemUTC();
     private SpringSecuritySaml implementation = new OpenSamlImplementation(time).init();
-    private SamlDefaults defaults = new SamlDefaults(time);
     private Network network = new Network();
+    private SamlTestObjectHelper helper;
 
     public SamlTestData(String idpBaseUrl, String spBaseUrl) {
         this.idpBaseUrl = idpBaseUrl;
         this.spBaseUrl = spBaseUrl;
+        helper = new SamlTestObjectHelper(time);
     }
 
     public IdentityProviderMetadata getIdentityProvider() {
         SimpleKey idpKey = IDP_RSA_KEY.getSimpleKey("the-idp-key");
-        return defaults.identityProviderMetadata(idpBaseUrl, idpKey, asList(idpKey), "saml/idp", "the-idp");
+        return helper.identityProviderMetadata(idpBaseUrl,
+                                               idpKey,
+                                               asList(idpKey),
+                                               "saml/idp",
+                                               "the-idp",
+                                               helper.DEFAULT_SIGN_ALGORITHM,
+                                               helper.DEFAULT_SIGN_DIGEST);
     }
 
 
     public ServiceProviderMetadata getServiceProvider() {
         SimpleKey spKey = SP_RSA_KEY.getSimpleKey("the-sp-key");
-        return defaults.serviceProviderMetadata(spBaseUrl, spKey, asList(spKey), "saml", "the-sp");
+        return helper.serviceProviderMetadata(spBaseUrl,
+                                              spKey,
+                                              asList(spKey),
+                                              "saml",
+                                              "the-sp",
+                                              helper.DEFAULT_SIGN_ALGORITHM,
+                                              helper.DEFAULT_SIGN_DIGEST);
     }
 
     public Assertion getAssertion(IdentityProviderMetadata idp, ServiceProviderMetadata sp) {
@@ -63,6 +75,6 @@ public class SamlTestData {
     public Assertion getAssertion(IdentityProviderMetadata idp,
             ServiceProviderMetadata sp,
             AuthenticationRequest request) {
-        return defaults.assertion(sp, idp, request, "testuser@test.org", NameId.EMAIL);
+        return helper.assertion(sp, idp, request, "testuser@test.org", NameId.EMAIL);
     }
 }

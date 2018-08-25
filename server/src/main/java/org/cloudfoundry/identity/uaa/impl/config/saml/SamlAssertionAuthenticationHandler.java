@@ -23,11 +23,11 @@ import org.cloudfoundry.identity.uaa.provider.saml.LoginSamlAuthenticationProvid
 
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
-import org.springframework.security.saml.SamlObjectResolver;
 import org.springframework.security.saml.SamlTransformer;
 import org.springframework.security.saml.SamlValidator;
-import org.springframework.security.saml.config.SamlServerConfiguration;
 import org.springframework.security.saml.key.SimpleKey;
+import org.springframework.security.saml.provider.provisioning.SamlProviderProvisioning;
+import org.springframework.security.saml.provider.service.ServiceProviderService;
 import org.springframework.security.saml.saml2.authentication.Assertion;
 import org.springframework.security.saml.saml2.metadata.IdentityProviderMetadata;
 import org.springframework.security.saml.saml2.metadata.ServiceProviderMetadata;
@@ -40,21 +40,18 @@ import static org.springframework.http.HttpMethod.GET;
 public class SamlAssertionAuthenticationHandler {
 
     private final SamlValidator validator;
-    private final SamlObjectResolver resolver;
-    private final SamlServerConfiguration configuration;
+    private final SamlProviderProvisioning<ServiceProviderService> resolver;
     private final SamlTransformer transformer;
     private final Network network;
     private final LoginSamlAuthenticationProvider authenticationProvider;
 
     public SamlAssertionAuthenticationHandler(SamlValidator validator,
-                                              SamlObjectResolver resolver,
-                                              SamlServerConfiguration configuration,
+                                              SamlProviderProvisioning<ServiceProviderService> resolver,
                                               SamlTransformer transformer,
                                               Network network,
                                               LoginSamlAuthenticationProvider authenticationProvider) {
         this.validator = validator;
         this.resolver = resolver;
-        this.configuration = configuration;
         this.transformer = transformer;
         this.network = network;
         this.authenticationProvider = authenticationProvider;
@@ -65,13 +62,11 @@ public class SamlAssertionAuthenticationHandler {
                                        String assertionParamValue) throws AuthenticationException {
 
 //        LocalServiceProviderConfiguration serviceProvider = getConfiguration().getServiceProvider();
-        ServiceProviderMetadata metadata = getResolver().getLocalServiceProvider(
-            network.getBasePath(request)
-        );
+        ServiceProviderMetadata metadata = getResolver().getHostedProvider(request).getMetadata();
         List<SimpleKey> keys = metadata.getServiceProvider().getKeys();
         String xml = getTransformer().samlDecode(assertionParamValue, GET.matches(request.getMethod()));
         Assertion assertion = (Assertion) getTransformer().fromXml(xml, null, keys);
-        IdentityProviderMetadata idpMetadata = getResolver().resolveIdentityProvider(assertion);
+        IdentityProviderMetadata idpMetadata = getResolver().getHostedProvider(request).getRemoteProvider(assertion);
         //validates the signature
         assertion = (Assertion) getTransformer().fromXml(xml, keys, idpMetadata.getIdentityProvider().getKeys());
         ValidationException validation = validateAssertion(request, assertion);
@@ -98,13 +93,10 @@ public class SamlAssertionAuthenticationHandler {
         return validator;
     }
 
-    public SamlObjectResolver getResolver() {
+    public SamlProviderProvisioning<ServiceProviderService> getResolver() {
         return resolver;
     }
 
-    public SamlServerConfiguration getConfiguration() {
-        return configuration;
-    }
 
     public SamlTransformer getTransformer() {
         return transformer;

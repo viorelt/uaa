@@ -18,12 +18,11 @@ import java.util.List;
 
 import org.springframework.security.saml.saml2.metadata.Endpoint;
 import org.springframework.security.saml.saml2.metadata.ServiceProviderMetadata;
-import org.springframework.security.saml.spi.DefaultSamlObjectResolver;
 
-public class SamlMetadataResolver extends DefaultSamlObjectResolver {
-    @Override
+public class SamlMetadataResolver  {
+
     public ServiceProviderMetadata getLocalServiceProvider(String baseUrl) {
-        ServiceProviderMetadata metadata = super.getLocalServiceProvider(baseUrl);
+        ServiceProviderMetadata metadata = null; //TODO
         List<Endpoint> logoutService = metadata.getServiceProvider().getSingleLogoutService();
         if (!logoutService.isEmpty()) {
             for (Endpoint endpoint : logoutService) {

@@ -71,7 +71,8 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.saml.SamlAuthentication;
-import org.springframework.security.saml.SamlObjectResolver;
+import org.springframework.security.saml.provider.provisioning.SamlProviderProvisioning;
+import org.springframework.security.saml.provider.service.ServiceProviderService;
 import org.springframework.security.saml.saml2.authentication.Assertion;
 import org.springframework.security.saml.saml2.authentication.AuthenticationContextClassReference;
 import org.springframework.security.saml.saml2.authentication.AuthenticationStatement;
@@ -98,7 +99,7 @@ public class LoginSamlAuthenticationProvider implements AuthenticationManager,Ap
     private ApplicationEventPublisher eventPublisher;
     private IdentityProviderProvisioning identityProviderProvisioning;
     private ScimGroupExternalMembershipManager externalMembershipManager;
-    private SamlObjectResolver resolver;
+    private SamlProviderProvisioning<ServiceProviderService> resolver;
 
     public void setIdentityProviderProvisioning(IdentityProviderProvisioning identityProviderProvisioning) {
         this.identityProviderProvisioning = identityProviderProvisioning;
@@ -112,7 +113,7 @@ public class LoginSamlAuthenticationProvider implements AuthenticationManager,Ap
         this.externalMembershipManager = externalMembershipManager;
     }
 
-    public LoginSamlAuthenticationProvider setResolver(SamlObjectResolver resolver) {
+    public LoginSamlAuthenticationProvider setResolver(SamlProviderProvisioning<ServiceProviderService> resolver) {
         this.resolver = resolver;
         return this;
     }
@@ -131,7 +132,7 @@ public class LoginSamlAuthenticationProvider implements AuthenticationManager,Ap
         IdentityZone zone = IdentityZoneHolder.get();
         logger.debug(String.format("Initiating SAML authentication in zone '%s' domain '%s'", zone.getId(), zone.getSubdomain()));
         SamlAuthentication token = (SamlAuthentication) authentication;
-        IdentityProviderMetadata idpm = resolver.resolveIdentityProvider(token.getAssertingEntityId());
+        IdentityProviderMetadata idpm = resolver.getHostedProvider(null).getRemoteProvider(token.getAssertingEntityId());
         String alias = idpm.getEntityAlias();
         String relayState = token.getRelayState();
         boolean addNew;

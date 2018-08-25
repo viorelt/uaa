@@ -16,6 +16,7 @@
 package org.cloudfoundry.identity.uaa.provider.saml;
 
 
+import javax.servlet.http.HttpServletRequest;
 import java.time.Clock;
 import java.util.Arrays;
 import java.util.List;
@@ -35,11 +36,14 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.springframework.security.oauth2.common.util.RandomValueStringGenerator;
+import org.springframework.security.saml.SamlMetadataException;
+import org.springframework.security.saml.SamlValidator;
+import org.springframework.security.saml.provider.config.SamlConfigurationRepository;
+import org.springframework.security.saml.provider.provisioning.HostBasedSamlServiceProviderProvisioning;
 import org.springframework.security.saml.saml2.metadata.IdentityProviderMetadata;
 import org.springframework.security.saml.spi.DefaultMetadataCache;
-import org.springframework.security.saml.spi.DefaultSamlObjectResolver;
 import org.springframework.security.saml.spi.DefaultSamlTransformer;
-import org.springframework.security.saml.spi.SamlMetadataException;
+import org.springframework.security.saml.spi.DefaultValidator;
 import org.springframework.security.saml.spi.SpringSecuritySaml;
 import org.springframework.security.saml.spi.opensaml.OpenSamlImplementation;
 import org.springframework.security.saml.util.Network;
@@ -130,10 +134,18 @@ public class SamlIdentityProviderConfiguratorTests {
     @Before
     public void setUp() throws Exception {
         configurator = new SamlIdentityProviderConfigurator();
+        DefaultMetadataCache metadataCache = new DefaultMetadataCache(Clock.systemUTC(), mockNetwork);
+        DefaultSamlTransformer samlTransformer = new DefaultSamlTransformer(implementation);
+        SamlValidator validator = new DefaultValidator(implementation);
+        SamlConfigurationRepository<HttpServletRequest> configRepo =
+            (SamlConfigurationRepository<HttpServletRequest>)mock(SamlConfigurationRepository.class);
         configurator.setResolver(
-            new DefaultSamlObjectResolver()
-                .setTransformer(new DefaultSamlTransformer(implementation))
-                .setMetadataCache(new DefaultMetadataCache(Clock.systemUTC(), mockNetwork))
+            new HostBasedSamlServiceProviderProvisioning(
+                configRepo,
+                samlTransformer,
+                validator,
+                metadataCache
+            )
         );
 
         bootstrap = new BootstrapSamlIdentityProviderData();

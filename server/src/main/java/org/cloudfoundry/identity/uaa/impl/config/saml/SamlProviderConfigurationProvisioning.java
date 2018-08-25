@@ -12,8 +12,9 @@
  *  ****************************************************************************
  */
 
-package org.cloudfoundry.identity.uaa.saml;
+package org.cloudfoundry.identity.uaa.impl.config.saml;
 
+import javax.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -24,6 +25,7 @@ import org.cloudfoundry.identity.uaa.constants.OriginKeys;
 import org.cloudfoundry.identity.uaa.provider.IdentityProvider;
 import org.cloudfoundry.identity.uaa.provider.IdentityProviderProvisioning;
 import org.cloudfoundry.identity.uaa.provider.SamlIdentityProviderDefinition;
+import org.cloudfoundry.identity.uaa.saml.SamlKey;
 import org.cloudfoundry.identity.uaa.util.UaaUrlUtils;
 import org.cloudfoundry.identity.uaa.zone.IdentityZone;
 import org.cloudfoundry.identity.uaa.zone.IdentityZoneConfiguration;
@@ -33,7 +35,9 @@ import org.cloudfoundry.identity.uaa.zone.SamlConfig;
 import org.springframework.security.saml.key.KeyType;
 import org.springframework.security.saml.key.SimpleKey;
 import org.springframework.security.saml.provider.SamlServerConfiguration;
+import org.springframework.security.saml.provider.config.NetworkConfiguration;
 import org.springframework.security.saml.provider.config.RotatingKeys;
+import org.springframework.security.saml.provider.config.SamlConfigurationRepository;
 import org.springframework.security.saml.provider.identity.config.LocalIdentityProviderConfiguration;
 import org.springframework.security.saml.provider.service.config.ExternalIdentityProviderConfiguration;
 import org.springframework.security.saml.provider.service.config.LocalServiceProviderConfiguration;
@@ -41,31 +45,45 @@ import org.springframework.security.saml.provider.service.config.LocalServicePro
 import static org.cloudfoundry.identity.uaa.util.UaaStringUtils.getHostIfArgIsURL;
 import static org.springframework.util.StringUtils.hasText;
 
-public class SamlConfigurationProvider extends SamlServerConfiguration {
+public class SamlProviderConfigurationProvisioning implements SamlConfigurationRepository<HttpServletRequest> {
 
     private final IdentityProviderProvisioning provisioning;
 
-    public SamlConfigurationProvider(IdentityProviderProvisioning provisioning) {
+    public SamlProviderConfigurationProvisioning(IdentityProviderProvisioning provisioning) {
         this.provisioning = provisioning;
     }
 
     @Override
-    public LocalIdentityProviderConfiguration getIdentityProvider() {
+    public SamlServerConfiguration getServerConfiguration(HttpServletRequest request) {
+        LocalIdentityProviderConfiguration idp = getIdentityProvider();
+        LocalServiceProviderConfiguration sp = getServiceProvider();
+        NetworkConfiguration network = new NetworkConfiguration()
+            .setConnectTimeout(10000)
+            .setReadTimeout(10000);
+
+        return new SamlServerConfiguration()
+            .setNetwork(network)
+            .setServiceProvider(sp)
+            .setIdentityProvider(idp);
+    }
+
+
+    private LocalIdentityProviderConfiguration getIdentityProvider() {
         IdentityZoneConfiguration zconfig = getIdentityZone().getConfig();
         SamlConfig samlConfig = zconfig.getSamlConfig();
         return getIdentityProvider(samlConfig);
 
     }
 
-    @Override
-    public LocalServiceProviderConfiguration getServiceProvider() {
+
+    private LocalServiceProviderConfiguration getServiceProvider() {
         IdentityZone identityZone = getIdentityZone();
         IdentityZoneConfiguration zconfig = identityZone.getConfig();
         SamlConfig samlConfig = zconfig.getSamlConfig();
         return getServiceProvider(samlConfig, identityZone.getId());
     }
 
-    protected LocalIdentityProviderConfiguration getIdentityProvider(SamlConfig samlConfig) {
+    private LocalIdentityProviderConfiguration getIdentityProvider(SamlConfig samlConfig) {
         String entityId = getEntityId(samlConfig);
         return new LocalIdentityProviderConfiguration()
             //.setSignAssertions(samlConfig.isAssertionSigned())
@@ -78,7 +96,7 @@ public class SamlConfigurationProvider extends SamlServerConfiguration {
             ;
     }
 
-    protected LocalServiceProviderConfiguration getServiceProvider(SamlConfig samlConfig, String zoneId) {
+    private LocalServiceProviderConfiguration getServiceProvider(SamlConfig samlConfig, String zoneId) {
         String entityId = getEntityId(samlConfig);
         LocalServiceProviderConfiguration result = new LocalServiceProviderConfiguration()
             .setSignRequests(samlConfig.isRequestSigned())
@@ -103,7 +121,7 @@ public class SamlConfigurationProvider extends SamlServerConfiguration {
         return result;
     }
 
-    protected ExternalIdentityProviderConfiguration getProviderConfiguration(
+    private ExternalIdentityProviderConfiguration getProviderConfiguration(
         IdentityProvider<SamlIdentityProviderDefinition> provider
     ) {
         return new ExternalIdentityProviderConfiguration()
@@ -114,7 +132,7 @@ public class SamlConfigurationProvider extends SamlServerConfiguration {
             .setMetadata(provider.getConfig().getMetaDataLocation());
     }
 
-    protected String getEntityId(SamlConfig samlConfig) {
+    private String getEntityId(SamlConfig samlConfig) {
         if (hasText(samlConfig.getEntityID())) {
             return samlConfig.getEntityID();
         } else {

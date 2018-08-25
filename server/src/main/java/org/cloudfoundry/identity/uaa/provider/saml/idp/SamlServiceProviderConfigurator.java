@@ -26,8 +26,9 @@ import org.cloudfoundry.identity.uaa.zone.IdentityZoneHolder;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.security.saml.SamlObjectResolver;
-import org.springframework.security.saml.config.ExternalServiceProviderConfiguration;
+import org.springframework.security.saml.provider.identity.IdentityProviderService;
+import org.springframework.security.saml.provider.identity.config.ExternalServiceProviderConfiguration;
+import org.springframework.security.saml.provider.provisioning.SamlProviderProvisioning;
 import org.springframework.security.saml.saml2.metadata.NameId;
 import org.springframework.security.saml.saml2.metadata.ServiceProviderMetadata;
 import org.springframework.util.StringUtils;
@@ -39,7 +40,7 @@ public class SamlServiceProviderConfigurator {
     private static final Logger LOG = LoggerFactory.getLogger(SamlServiceProviderConfigurator.class);
 
     private SamlServiceProviderProvisioning providerProvisioning;
-    private SamlObjectResolver resolver;
+    private SamlProviderProvisioning<IdentityProviderService> resolver;
     private Set<NameId> supportedNameIDs = new HashSet<>(
         Arrays.asList(
             NameId.EMAIL,
@@ -156,7 +157,7 @@ public class SamlServiceProviderConfigurator {
             .setSkipSslValidation(provider.getConfig().isSkipSslValidation())
             .setMetadataTrustCheck(provider.getConfig().isMetadataTrustCheck());
 
-        return getResolver().resolveServiceProvider(config);
+        return getResolver().getHostedProvider(null).getRemoteProvider(config);
 
     }
 
@@ -176,12 +177,12 @@ public class SamlServiceProviderConfigurator {
         this.supportedNameIDs = supportedNameIDs;
     }
 
-    public SamlServiceProviderConfigurator setResolver(SamlObjectResolver resolver) {
+    public SamlServiceProviderConfigurator setResolver(SamlProviderProvisioning<IdentityProviderService> resolver) {
         this.resolver = resolver;
         return this;
     }
 
-    public SamlObjectResolver getResolver() {
+    public SamlProviderProvisioning<IdentityProviderService> getResolver() {
         return resolver;
     }
 }

@@ -29,8 +29,9 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.http.client.utils.URIBuilder;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.security.saml.SamlException;
-import org.springframework.security.saml.SamlObjectResolver;
-import org.springframework.security.saml.config.ExternalIdentityProviderConfiguration;
+import org.springframework.security.saml.provider.provisioning.SamlProviderProvisioning;
+import org.springframework.security.saml.provider.service.ServiceProviderService;
+import org.springframework.security.saml.provider.service.config.ExternalIdentityProviderConfiguration;
 import org.springframework.security.saml.saml2.metadata.IdentityProviderMetadata;
 import org.springframework.util.StringUtils;
 
@@ -40,7 +41,7 @@ public class SamlIdentityProviderConfigurator implements InitializingBean {
     private static Log logger = LogFactory.getLog(SamlIdentityProviderConfigurator.class);
 
     private IdentityProviderProvisioning providerProvisioning;
-    private SamlObjectResolver resolver;
+    private SamlProviderProvisioning<ServiceProviderService> resolver;
 
     public SamlIdentityProviderConfigurator() {
     }
@@ -149,7 +150,7 @@ public class SamlIdentityProviderConfigurator implements InitializingBean {
             .setSkipSslValidation(def.isSkipSslValidation())
             .setMetadataTrustCheck(def.isMetadataTrustCheck());
 
-        return resolver.resolveIdentityProvider(config);
+        return resolver.getHostedProvider(null).getRemoteProvider(config);
 //        configMetadataProvider.setParserPool(getParserPool());
 //        ExtendedMetadata extendedMetadata = new ExtendedMetadata();
 //        extendedMetadata.setLocal(false);
@@ -186,7 +187,7 @@ public class SamlIdentityProviderConfigurator implements InitializingBean {
         this.providerProvisioning = providerProvisioning;
     }
 
-    public SamlIdentityProviderConfigurator setResolver(SamlObjectResolver resolver) {
+    public SamlIdentityProviderConfigurator setResolver(SamlProviderProvisioning<ServiceProviderService> resolver) {
         this.resolver = resolver;
         return this;
     }
