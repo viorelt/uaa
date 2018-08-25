@@ -24,14 +24,15 @@ import java.nio.charset.StandardCharsets;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.saml.SamlAuthentication;
 import org.springframework.security.saml.SamlException;
-import org.springframework.security.saml.SamlObjectResolver;
 import org.springframework.security.saml.SamlTransformer;
+import org.springframework.security.saml.provider.provisioning.SamlProviderProvisioning;
+import org.springframework.security.saml.provider.service.ServiceProviderService;
 import org.springframework.security.saml.saml2.Saml2Object;
 import org.springframework.security.saml.saml2.authentication.LogoutRequest;
 import org.springframework.security.saml.saml2.authentication.NameIdPrincipal;
 import org.springframework.security.saml.saml2.metadata.IdentityProviderMetadata;
 import org.springframework.security.saml.saml2.metadata.ServiceProviderMetadata;
-import org.springframework.security.saml.spi.SamlDefaults;
+
 import org.springframework.security.saml.util.Network;
 import org.springframework.security.web.authentication.logout.LogoutHandler;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -39,23 +40,17 @@ import org.springframework.web.util.UriUtils;
 
 public class SimpleSpLogoutHandler implements LogoutHandler {
 
-    private final SamlObjectResolver resolver;
+    private final SamlProviderProvisioning<ServiceProviderService> resolver;
     private final Network network;
-    private final SamlDefaults samlDefaults;
     private final SamlTransformer transformer;
 
-    public SimpleSpLogoutHandler(SamlObjectResolver resolver, Network network, SamlDefaults samlDefaults, SamlTransformer transformer) {
+    public SimpleSpLogoutHandler(SamlProviderProvisioning<ServiceProviderService> resolver, Network network, SamlTransformer transformer) {
         this.resolver = resolver;
         this.network = network;
-        this.samlDefaults = samlDefaults;
         this.transformer = transformer;
     }
 
-    public SamlDefaults getSamlDefaults() {
-        return samlDefaults;
-    }
-
-    public SamlObjectResolver getResolver() {
+    public SamlProviderProvisioning<ServiceProviderService> getResolver() {
         return resolver;
     }
 
@@ -85,11 +80,11 @@ public class SimpleSpLogoutHandler implements LogoutHandler {
     protected boolean logoutSpInitiated(HttpServletRequest request,
                                         HttpServletResponse response,
                                         SamlAuthentication sa) throws IOException {
-        ServiceProviderMetadata sp = getResolver().getLocalServiceProvider(getNetwork().getBasePath(request));
-        IdentityProviderMetadata idp = getResolver().resolveIdentityProvider(sa.getAssertingEntityId());
-        LogoutRequest lr = getSamlDefaults().logoutRequest(
+        ServiceProviderService provider = getResolver().getHostedProvider(request);
+        ServiceProviderMetadata sp = provider.getMetadata();
+        IdentityProviderMetadata idp = provider.getRemoteProvider(sa.getAssertingEntityId());
+        LogoutRequest lr = provider.logoutRequest(
             idp,
-            sp,
             (NameIdPrincipal) sa.getSamlPrincipal()
         );
         if (lr.getDestination() != null) {

@@ -14,43 +14,18 @@
 
 package org.cloudfoundry.identity.uaa.impl.config.saml;
 
-import javax.servlet.http.HttpServletRequest;
-import java.util.Optional;
+import org.springframework.security.saml.provider.provisioning.SamlProviderProvisioning;
+import org.springframework.security.saml.provider.service.SamlAuthenticationRequestByIdpAliasFilter;
+import org.springframework.security.saml.provider.service.ServiceProviderService;
+import org.springframework.security.web.util.matcher.RequestMatcher;
 
-import org.springframework.security.authentication.ProviderNotFoundException;
-import org.springframework.security.saml.config.ExternalIdentityProviderConfiguration;
-import org.springframework.security.saml.config.LocalServiceProviderConfiguration;
-import org.springframework.security.saml.saml2.metadata.IdentityProviderMetadata;
-import org.springframework.security.saml.spi.DefaultAuthnRequestHandler;
+public class SamlDiscoveryHandler extends SamlAuthenticationRequestByIdpAliasFilter {
 
-public class SamlDiscoveryHandler extends DefaultAuthnRequestHandler {
-
-
-    @Override
-    protected IdentityProviderMetadata getIdentityProvider(HttpServletRequest request) {
-        ExternalIdentityProviderConfiguration idp = getSamlIdp(request);
-        return getResolver().resolveIdentityProvider(idp);
+    public SamlDiscoveryHandler(SamlProviderProvisioning<ServiceProviderService> provisioning) {
+        super(provisioning);
     }
 
-
-    @SuppressWarnings("checked")
-    protected ExternalIdentityProviderConfiguration getSamlIdp(HttpServletRequest request) {
-        //in the library implementation the `idp` parameter is the entityId
-        //in UAA, the idp parameter is the alias
-        String idp = request.getParameter("idp");
-        LocalServiceProviderConfiguration config = getConfiguration().getServiceProvider();
-        Optional<ExternalIdentityProviderConfiguration> result =
-            config.getProviders().stream()
-                .filter(
-                    p -> idp.equals(p.getAlias())
-                )
-                .findFirst();
-        if (result.isPresent()) {
-            return result.get();
-        } else {
-            throw new ProviderNotFoundException(idp);
-        }
+    public SamlDiscoveryHandler(SamlProviderProvisioning<ServiceProviderService> provisioning, RequestMatcher requestMatcher) {
+        super(provisioning, requestMatcher);
     }
-
-
 }

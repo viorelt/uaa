@@ -15,8 +15,6 @@
 package org.cloudfoundry.identity.uaa.impl.config.saml;
 
 import javax.servlet.Filter;
-import java.util.Arrays;
-import java.util.List;
 
 import org.cloudfoundry.identity.uaa.authentication.SamlRedirectLogoutHandler;
 import org.cloudfoundry.identity.uaa.authentication.UaaSamlLogoutFilter;
@@ -24,25 +22,24 @@ import org.cloudfoundry.identity.uaa.provider.IdentityProviderProvisioning;
 import org.cloudfoundry.identity.uaa.provider.saml.LoginSAMLAuthenticationFailureHandler;
 import org.cloudfoundry.identity.uaa.provider.saml.LoginSamlAuthenticationProvider;
 import org.cloudfoundry.identity.uaa.provider.saml.SamlIdentityProviderConfigurator;
-import org.cloudfoundry.identity.uaa.saml.SamlConfigurationProvider;
 import org.cloudfoundry.identity.uaa.scim.ScimGroupExternalMembershipManager;
 import org.cloudfoundry.identity.uaa.user.UaaUserDatabase;
 
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.security.saml.SamlMessageHandler;
-import org.springframework.security.saml.SamlObjectResolver;
-import org.springframework.security.saml.config.SamlServerConfiguration;
-import org.springframework.security.saml.spi.AbstractProviderConfiguration;
-import org.springframework.security.saml.spi.DefaultLogoutHandler;
+import org.springframework.security.saml.provider.SamlServerConfiguration;
+import org.springframework.security.saml.provider.service.authentication.SamlResponseAuthenticationFilter;
+import org.springframework.security.saml.provider.service.config.LocalServiceProviderConfiguration;
+import org.springframework.security.saml.provider.service.config.SamlServiceProviderSecurityConfiguration;
+import org.springframework.security.saml.util.Network;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.security.web.authentication.logout.LogoutHandler;
 import org.springframework.security.web.authentication.logout.LogoutSuccessHandler;
 import org.springframework.security.web.authentication.logout.SecurityContextLogoutHandler;
 
 @Configuration
-public class HostedSamlConfiguration extends AbstractProviderConfiguration {
+public class HostedSamlServiceProviderConfiguration extends SamlServiceProviderSecurityConfiguration {
 
     private AuthenticationSuccessHandler successHandler;
     private UaaUserDatabase userDatabase;
@@ -51,14 +48,20 @@ public class HostedSamlConfiguration extends AbstractProviderConfiguration {
     private LogoutSuccessHandler mainLogoutHandler;
     private LogoutHandler uaaAuthenticationFailureHandler;
 
-    public HostedSamlConfiguration(
+    public HostedSamlServiceProviderConfiguration(
         @Qualifier("userDatabase") UaaUserDatabase userDb,
         @Qualifier("identityProviderProvisioning") IdentityProviderProvisioning idpProvisioning,
         @Qualifier("externalGroupMembershipManager") ScimGroupExternalMembershipManager extMbrManager,
         @Qualifier("successRedirectHandler") AuthenticationSuccessHandler successHandler,
         @Qualifier("logoutHandler") LogoutSuccessHandler logoutHandler,
         @Qualifier("uaaAuthenticationFailureHandler") LogoutHandler uaaAuthenticationFailureHandler) {
-
+        super(
+            new SamlServerConfiguration()
+                .setServiceProvider(
+                    new LocalServiceProviderConfiguration()
+                        .setPrefix("/saml")
+                )
+        );
         this.userDatabase = userDb;
         this.identityProviderProvisioning = idpProvisioning;
         this.externalMembershipManager = extMbrManager;
@@ -67,59 +70,21 @@ public class HostedSamlConfiguration extends AbstractProviderConfiguration {
         this.uaaAuthenticationFailureHandler = uaaAuthenticationFailureHandler;
     }
 
+    @Bean
     @Override
-    @Bean
-    public SamlObjectResolver resolver() {
-        return new SamlMetadataResolver();
+    public Filter spAuthenticationResponseFilter() {
+        SamlResponseAuthenticationFilter filter =
+            (SamlResponseAuthenticationFilter) super.spAuthenticationResponseFilter();
+        filter.setAuthenticationManager(samlAuthenticationManager());
+        filter.setAuthenticationFailureHandler(loginSAMLAuthenticationFailureHandler());
+        filter.setAuthenticationSuccessHandler(successHandler);
+        return filter;
     }
 
-    @Bean
-    public SamlServerConfiguration samlServerConfiguration() {
-        return new SamlConfigurationProvider(identityProviderProvisioning);
-    }
 
-    @Bean
-    public SamlMessageHandler discoveryHandler(SamlServerConfiguration configuration) {
-        return new SamlDiscoveryHandler()
-            .setSamlDefaults(samlDefaults())
-            .setNetwork(network(configuration))
-            .setResolver(resolver())
-            .setTransformer(transformer())
-            .setConfiguration(configuration);
-    }
-
-    @Bean
-    public SamlMessageHandler spResponseHandler(SamlServerConfiguration configuration) {
-        return new ServiceProviderResponseHandler()
-            .setSuccessHandler(successHandler)
-            .setFailureHandler(loginSAMLAuthenticationFailureHandler())
-            .setAuthenticationManager(samlAuthenticationManager())
-            .setSamlDefaults(samlDefaults())
-            .setNetwork(network(configuration))
-            .setResolver(resolver())
-            .setTransformer(transformer())
-            .setConfiguration(configuration)
-            .setValidator(validator())
-            .setSamlTemplateEngine(samlTemplateEngine());
-    }
-
-    @Override
     @Bean(name = "samlLogoutHandler")
-    public SamlMessageHandler logoutHandler(SamlServerConfiguration configuration) {
-        return ((DefaultLogoutHandler)super.logoutHandler(configuration))
-            .setLogoutSuccessHandler(samlWhitelistLogoutHandler())
-            .setLogoutPath("SingleLogout");
-    }
-
-    @Override
-    @Bean
-    public List<SamlMessageHandler> handlers(SamlServerConfiguration configuration) {
-        return Arrays.asList(
-            metadataHandler(configuration),
-            discoveryHandler(configuration),
-            logoutHandler(configuration),
-            spResponseHandler(configuration)
-        );
+    public LogoutHandler logoutHandler() {
+        return samlLogoutHandler();
     }
 
     @Bean(name = "samlAuthenticationProvider")
@@ -128,13 +93,10 @@ public class HostedSamlConfiguration extends AbstractProviderConfiguration {
         result.setUserDatabase(userDatabase);
         result.setIdentityProviderProvisioning(identityProviderProvisioning);
         result.setExternalMembershipManager(externalMembershipManager);
-        result.setResolver(resolver());
+
         return result;
     }
 
-    //    <bean id="idpProviders" class="org.cloudfoundry.identity.uaa.provider.saml.SamlIdentityProviderConfigurator">
-//        <property name="identityProviderProvisioning" ref="identityProviderProvisioning"/>
-//    </bean>
     @Bean(name = "idpProviders")
     public SamlIdentityProviderConfigurator idpProviders() {
         return samlIdentityProviderConfigurator();
@@ -144,7 +106,6 @@ public class HostedSamlConfiguration extends AbstractProviderConfiguration {
     public SamlIdentityProviderConfigurator samlIdentityProviderConfigurator() {
         SamlIdentityProviderConfigurator result = new SamlIdentityProviderConfigurator();
         result.setIdentityProviderProvisioning(identityProviderProvisioning);
-        result.setResolver(resolver());
         return result;
     }
 
@@ -164,10 +125,11 @@ public class HostedSamlConfiguration extends AbstractProviderConfiguration {
 
     public SimpleSpLogoutHandler getSimpleSpLogoutHandler() {
         return new SimpleSpLogoutHandler(
-            resolver(),
-            network(samlServerConfiguration()),
-            samlDefaults(),
-            transformer()
+            getSamlProvisioning(),
+            new Network() //TODO
+                .setReadTimeoutMillis(10000)
+                .setConnectTimeoutMillis(10000),
+            samlTransformer()
         );
     }
 
@@ -187,11 +149,12 @@ public class HostedSamlConfiguration extends AbstractProviderConfiguration {
     @Bean(name = "assertionAuthenticationHandler")
     public SamlAssertionAuthenticationHandler assertionAuthenticationHandler() {
         return new SamlAssertionAuthenticationHandler(
-            validator(),
-            resolver(),
-            samlServerConfiguration(),
-            transformer(),
-            network(samlServerConfiguration()),
+            samlValidator(),
+            getSamlProvisioning(),
+            samlTransformer(),
+            new Network()
+                .setConnectTimeoutMillis(10000)
+                .setReadTimeoutMillis(10000),//TODO
             samlAuthenticationManager()
         );
     }
