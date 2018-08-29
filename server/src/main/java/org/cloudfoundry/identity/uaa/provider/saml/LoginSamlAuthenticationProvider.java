@@ -132,7 +132,7 @@ public class LoginSamlAuthenticationProvider implements AuthenticationManager,Ap
         IdentityZone zone = IdentityZoneHolder.get();
         logger.debug(String.format("Initiating SAML authentication in zone '%s' domain '%s'", zone.getId(), zone.getSubdomain()));
         SamlAuthentication token = (SamlAuthentication) authentication;
-        IdentityProviderMetadata idpm = resolver.getHostedProvider(null).getRemoteProvider(token.getAssertingEntityId());
+        IdentityProviderMetadata idpm = resolver.getHostedProvider().getRemoteProvider(token.getAssertingEntityId());
         String alias = idpm.getEntityAlias();
         String relayState = token.getRelayState();
         boolean addNew;

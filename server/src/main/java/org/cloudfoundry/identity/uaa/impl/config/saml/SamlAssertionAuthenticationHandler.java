@@ -62,11 +62,11 @@ public class SamlAssertionAuthenticationHandler {
                                        String assertionParamValue) throws AuthenticationException {
 
 //        LocalServiceProviderConfiguration serviceProvider = getConfiguration().getServiceProvider();
-        ServiceProviderMetadata metadata = getResolver().getHostedProvider(request).getMetadata();
+        ServiceProviderMetadata metadata = getResolver().getHostedProvider().getMetadata();
         List<SimpleKey> keys = metadata.getServiceProvider().getKeys();
         String xml = getTransformer().samlDecode(assertionParamValue, GET.matches(request.getMethod()));
         Assertion assertion = (Assertion) getTransformer().fromXml(xml, null, keys);
-        IdentityProviderMetadata idpMetadata = getResolver().getHostedProvider(request).getRemoteProvider(assertion);
+        IdentityProviderMetadata idpMetadata = getResolver().getHostedProvider().getRemoteProvider(assertion);
         //validates the signature
         assertion = (Assertion) getTransformer().fromXml(xml, keys, idpMetadata.getIdentityProvider().getKeys());
         ValidationException validation = validateAssertion(request, assertion);

@@ -157,7 +157,7 @@ public class SamlServiceProviderConfigurator {
             .setSkipSslValidation(provider.getConfig().isSkipSslValidation())
             .setMetadataTrustCheck(provider.getConfig().isMetadataTrustCheck());
 
-        return getResolver().getHostedProvider(null).getRemoteProvider(config);
+        return getResolver().getHostedProvider().getRemoteProvider(config);
 
     }
 

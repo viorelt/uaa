@@ -80,7 +80,7 @@ public class SimpleSpLogoutHandler implements LogoutHandler {
     protected boolean logoutSpInitiated(HttpServletRequest request,
                                         HttpServletResponse response,
                                         SamlAuthentication sa) throws IOException {
-        ServiceProviderService provider = getResolver().getHostedProvider(request);
+        ServiceProviderService provider = getResolver().getHostedProvider();
         ServiceProviderMetadata sp = provider.getMetadata();
         IdentityProviderMetadata idp = provider.getRemoteProvider(sa.getAssertingEntityId());
         LogoutRequest lr = provider.logoutRequest(

@@ -14,7 +14,6 @@
 
 package org.cloudfoundry.identity.uaa.impl.config.saml;
 
-import javax.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -37,7 +36,6 @@ import org.springframework.security.saml.key.SimpleKey;
 import org.springframework.security.saml.provider.SamlServerConfiguration;
 import org.springframework.security.saml.provider.config.NetworkConfiguration;
 import org.springframework.security.saml.provider.config.RotatingKeys;
-import org.springframework.security.saml.provider.config.SamlConfigurationRepository;
 import org.springframework.security.saml.provider.identity.config.LocalIdentityProviderConfiguration;
 import org.springframework.security.saml.provider.service.config.ExternalIdentityProviderConfiguration;
 import org.springframework.security.saml.provider.service.config.LocalServiceProviderConfiguration;
@@ -45,7 +43,7 @@ import org.springframework.security.saml.provider.service.config.LocalServicePro
 import static org.cloudfoundry.identity.uaa.util.UaaStringUtils.getHostIfArgIsURL;
 import static org.springframework.util.StringUtils.hasText;
 
-public class SamlProviderConfigurationProvisioning implements SamlConfigurationRepository<HttpServletRequest> {
+public class SamlProviderConfigurationProvisioning {
 
     private final IdentityProviderProvisioning provisioning;
 
@@ -53,8 +51,8 @@ public class SamlProviderConfigurationProvisioning implements SamlConfigurationR
         this.provisioning = provisioning;
     }
 
-    @Override
-    public SamlServerConfiguration getServerConfiguration(HttpServletRequest request) {
+
+    public SamlServerConfiguration getServerConfiguration() {
         LocalIdentityProviderConfiguration idp = getIdentityProvider();
         LocalServiceProviderConfiguration sp = getServiceProvider();
         NetworkConfiguration network = new NetworkConfiguration()

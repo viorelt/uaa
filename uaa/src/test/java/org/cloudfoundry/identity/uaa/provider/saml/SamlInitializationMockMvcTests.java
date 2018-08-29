@@ -61,7 +61,7 @@ public class SamlInitializationMockMvcTests extends InjectedMockContextTest {
     @Test
     public void sp_initialized_in_non_snarl_metadata_manager() throws Exception {
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "http://localhost");
-        ServiceProviderMetadata localServiceProvider = resolver.getHostedProvider(request).getMetadata();
+        ServiceProviderMetadata localServiceProvider = resolver.getHostedProvider().getMetadata();
         assertNotNull(localServiceProvider);
         String providerSpAlias = localServiceProvider.getEntityAlias();
         assertEquals(entityAlias, providerSpAlias);
@@ -79,7 +79,7 @@ public class SamlInitializationMockMvcTests extends InjectedMockContextTest {
         zone = zoneProvisioning.create(zone);
         IdentityZoneHolder.set(zone);
         MockHttpServletRequest request = new MockHttpServletRequest("GET", subdomain + "." + "http://localhost");
-        ServiceProviderMetadata localServiceProvider = resolver.getHostedProvider(request).getMetadata();
+        ServiceProviderMetadata localServiceProvider = resolver.getHostedProvider().getMetadata();
         assertNotNull(localServiceProvider);
         String providerSpAlias = localServiceProvider.getEntityAlias();
         assertEquals(subdomain + "." + entityAlias, providerSpAlias);

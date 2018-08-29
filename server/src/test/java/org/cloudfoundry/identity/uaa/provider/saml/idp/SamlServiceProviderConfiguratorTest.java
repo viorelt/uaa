@@ -14,7 +14,8 @@
  */
 package org.cloudfoundry.identity.uaa.provider.saml.idp;
 
-import javax.servlet.http.HttpServletRequest;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.time.Clock;
 import java.util.Arrays;
 import java.util.List;
@@ -33,13 +34,15 @@ import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
+import org.mockito.stubbing.Answer;
 import org.springframework.security.oauth2.common.util.RandomValueStringGenerator;
-import org.springframework.security.saml.SamlValidator;
-import org.springframework.security.saml.provider.config.SamlConfigurationRepository;
+import org.springframework.security.saml.SamlMetadataException;
+import org.springframework.security.saml.provider.identity.IdentityProviderService;
+import org.springframework.security.saml.provider.identity.config.ExternalServiceProviderConfiguration;
 import org.springframework.security.saml.provider.provisioning.HostBasedSamlIdentityProviderProvisioning;
+import org.springframework.security.saml.saml2.metadata.ServiceProviderMetadata;
 import org.springframework.security.saml.spi.DefaultMetadataCache;
 import org.springframework.security.saml.spi.DefaultSamlTransformer;
-import org.springframework.security.saml.spi.DefaultValidator;
 import org.springframework.security.saml.spi.SpringSecuritySaml;
 import org.springframework.security.saml.spi.opensaml.OpenSamlImplementation;
 import org.springframework.security.saml.util.Network;
@@ -51,14 +54,16 @@ import static org.cloudfoundry.identity.uaa.provider.saml.idp.SamlTestUtils.mock
 import static org.cloudfoundry.identity.uaa.provider.saml.idp.SamlTestUtils.mockSamlServiceProviderMetadatauriForZone;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
 
 public class SamlServiceProviderConfiguratorTest {
 
     private static SpringSecuritySaml implementation;
-    private Network mockNetwork = mock(Network.class);
+    private Network mockNetwork = spy(new Network());
 
     @BeforeClass
     public static void initializeOpenSAML() throws Exception {
@@ -81,22 +86,30 @@ public class SamlServiceProviderConfiguratorTest {
     public void setup() throws Exception {
         samlTestUtils.initialize();
         conf = new SamlServiceProviderConfigurator();
-        DefaultMetadataCache metadataCache = new DefaultMetadataCache(Clock.systemUTC(), mockNetwork);
         DefaultSamlTransformer samlTransformer = new DefaultSamlTransformer(implementation);
-        SamlValidator validator = new DefaultValidator(implementation);
-        SamlConfigurationRepository<HttpServletRequest> configRepo =
-            (SamlConfigurationRepository<HttpServletRequest>)mock(SamlConfigurationRepository.class);
-        conf.setResolver(
-            new HostBasedSamlIdentityProviderProvisioning(
-                configRepo,
-                samlTransformer,
-                validator,
-                metadataCache
-            )
-        );
+        DefaultMetadataCache cache = new DefaultMetadataCache(Clock.systemUTC(), mockNetwork);
+        HostBasedSamlIdentityProviderProvisioning resolver = mock(HostBasedSamlIdentityProviderProvisioning.class);
+        conf.setResolver(resolver);
+        IdentityProviderService identityProviderService = mock(IdentityProviderService.class);
+        when(resolver.getHostedProvider()).thenReturn(identityProviderService);
+
+        when(identityProviderService.getRemoteProvider(any(ExternalServiceProviderConfiguration.class)))
+            .then(
+                (Answer<ServiceProviderMetadata>) invocation -> {
+                    Object[] arguments = invocation.getArguments();
+                    ExternalServiceProviderConfiguration config = (ExternalServiceProviderConfiguration)arguments[0];
+                    String metadata;
+                    if (isUri(config.getMetadata())) {
+                        metadata = new String(cache.getMetadata(config.getMetadata(), true));
+                    } else {
+                        metadata = config.getMetadata();
+                    }
+                    return (ServiceProviderMetadata) samlTransformer.fromXml(metadata.getBytes(), null, null);
+                }
+            );
+
         providerProvisioning = mock(SamlServiceProviderProvisioning.class);
         conf.setProviderProvisioning(providerProvisioning);
-
     }
 
     @After
@@ -232,8 +245,10 @@ public class SamlServiceProviderConfiguratorTest {
     @Test
     public void testGetExtendedMetadataDelegateUrl() throws Exception {
         slowHttpServer.run();
-        expectedEx.expect(RuntimeException.class);
-        expectedEx.expectMessage("Unable to successfully get metadata from:https://localhost:23439");
+        expectedEx.expect(SamlMetadataException.class);
+        mockNetwork
+            .setReadTimeoutMillis(100)
+            .setConnectTimeoutMillis(100);
 
         SamlServiceProvider provider = mockSamlServiceProviderMetadatauriForZone("https://localhost:" + SlowHttpServer.PORT);
 
@@ -245,4 +260,13 @@ public class SamlServiceProviderConfiguratorTest {
         conf.validateSamlServiceProvider(mockSamlServiceProviderForZoneWithoutSPSSOInMetadata("uaa"));
     }
 
+    private static boolean isUri(String uri) {
+        boolean isUri = false;
+        try {
+            new URI(uri);
+            isUri = true;
+        } catch (URISyntaxException e) {
+        }
+        return isUri;
+    }
 }

@@ -16,7 +16,6 @@
 package org.cloudfoundry.identity.uaa.provider.saml;
 
 import javax.servlet.ServletContext;
-import javax.servlet.http.HttpServletRequest;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -102,7 +101,6 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -231,7 +229,7 @@ public class LoginSamlAuthenticationProviderTests extends JdbcTestBase {
 
         resolver = (SamlProviderProvisioning<ServiceProviderService>)mock(SamlProviderProvisioning.class);
         ServiceProviderService spService = mock(ServiceProviderService.class);
-        when(resolver.getHostedProvider(any(HttpServletRequest.class))).thenReturn(spService);
+        when(resolver.getHostedProvider()).thenReturn(spService);
         IdentityProviderMetadata idpm = new IdentityProviderMetadata().setEntityAlias(OriginKeys.SAML);
         when(spService.getRemoteProvider(anyString())).thenReturn(idpm);
 

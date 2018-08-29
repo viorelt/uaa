@@ -139,10 +139,8 @@ public class SamlIdentityProviderConfigurator implements InitializingBean {
     }
 
     protected IdentityProviderMetadata configureXMLMetadata(SamlIdentityProviderDefinition def) {
-        String zoneId = def.getZoneId();
         String alias = def.getIdpEntityAlias();
         String metadata = def.getMetaDataLocation();
-        IdentityProviderMetadata delegate = null;
 
         ExternalIdentityProviderConfiguration config = new ExternalIdentityProviderConfiguration()
             .setAlias(alias)
@@ -150,13 +148,7 @@ public class SamlIdentityProviderConfigurator implements InitializingBean {
             .setSkipSslValidation(def.isSkipSslValidation())
             .setMetadataTrustCheck(def.isMetadataTrustCheck());
 
-        return resolver.getHostedProvider(null).getRemoteProvider(config);
-//        configMetadataProvider.setParserPool(getParserPool());
-//        ExtendedMetadata extendedMetadata = new ExtendedMetadata();
-//        extendedMetadata.setLocal(false);
-//        extendedMetadata.setAlias(def.getIdpEntityAlias());
-//        ExtendedMetadataDelegate delegate = new ExtendedMetadataDelegate(configMetadataProvider, extendedMetadata);
-//        delegate.setMetadataTrustCheck(def.isMetadataTrustCheck());
+        return resolver.getHostedProvider().getRemoteProvider(config);
     }
 
 

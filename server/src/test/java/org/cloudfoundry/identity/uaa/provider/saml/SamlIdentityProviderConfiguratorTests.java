@@ -16,7 +16,8 @@
 package org.cloudfoundry.identity.uaa.provider.saml;
 
 
-import javax.servlet.http.HttpServletRequest;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.time.Clock;
 import java.util.Arrays;
 import java.util.List;
@@ -35,15 +36,15 @@ import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
+import org.mockito.stubbing.Answer;
 import org.springframework.security.oauth2.common.util.RandomValueStringGenerator;
 import org.springframework.security.saml.SamlMetadataException;
-import org.springframework.security.saml.SamlValidator;
-import org.springframework.security.saml.provider.config.SamlConfigurationRepository;
 import org.springframework.security.saml.provider.provisioning.HostBasedSamlServiceProviderProvisioning;
+import org.springframework.security.saml.provider.service.ServiceProviderService;
+import org.springframework.security.saml.provider.service.config.ExternalIdentityProviderConfiguration;
 import org.springframework.security.saml.saml2.metadata.IdentityProviderMetadata;
 import org.springframework.security.saml.spi.DefaultMetadataCache;
 import org.springframework.security.saml.spi.DefaultSamlTransformer;
-import org.springframework.security.saml.spi.DefaultValidator;
 import org.springframework.security.saml.spi.SpringSecuritySaml;
 import org.springframework.security.saml.spi.opensaml.OpenSamlImplementation;
 import org.springframework.security.saml.util.Network;
@@ -53,6 +54,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.doReturn;
@@ -134,19 +136,29 @@ public class SamlIdentityProviderConfiguratorTests {
     @Before
     public void setUp() throws Exception {
         configurator = new SamlIdentityProviderConfigurator();
-        DefaultMetadataCache metadataCache = new DefaultMetadataCache(Clock.systemUTC(), mockNetwork);
+
         DefaultSamlTransformer samlTransformer = new DefaultSamlTransformer(implementation);
-        SamlValidator validator = new DefaultValidator(implementation);
-        SamlConfigurationRepository<HttpServletRequest> configRepo =
-            (SamlConfigurationRepository<HttpServletRequest>)mock(SamlConfigurationRepository.class);
-        configurator.setResolver(
-            new HostBasedSamlServiceProviderProvisioning(
-                configRepo,
-                samlTransformer,
-                validator,
-                metadataCache
-            )
-        );
+        DefaultMetadataCache cache = new DefaultMetadataCache(Clock.systemUTC(), mockNetwork);
+        HostBasedSamlServiceProviderProvisioning resolver = mock(HostBasedSamlServiceProviderProvisioning.class);
+        configurator.setResolver(resolver);
+        ServiceProviderService serviceProviderService = mock(ServiceProviderService.class);
+        when(resolver.getHostedProvider()).thenReturn(serviceProviderService);
+
+        when(serviceProviderService.getRemoteProvider(any(ExternalIdentityProviderConfiguration.class)))
+            .then(
+                (Answer<IdentityProviderMetadata>) invocation -> {
+                    Object[] arguments = invocation.getArguments();
+                    ExternalIdentityProviderConfiguration config = (ExternalIdentityProviderConfiguration)arguments[0];
+                    String metadata;
+                    if (isUri(config.getMetadata())) {
+                        metadata = new String(cache.getMetadata(config.getMetadata(), true));
+                    } else {
+                        metadata = config.getMetadata();
+                    }
+                    return (IdentityProviderMetadata) samlTransformer.fromXml(metadata.getBytes(), null, null);
+                }
+            );
+
 
         bootstrap = new BootstrapSamlIdentityProviderData();
         singleAdd = new SamlIdentityProviderDefinition()
@@ -167,6 +179,8 @@ public class SamlIdentityProviderConfiguratorTests {
           .setLinkText("sample-link-test")
           .setIconUrl("sample-icon-url")
           .setZoneId("uaa");
+
+
         configurator.setIdentityProviderProvisioning(provisioning);
     }
 
@@ -301,5 +315,15 @@ public class SamlIdentityProviderConfiguratorTests {
         def.setMetaDataLocation("https://localhost:23439");
         def.setSkipSslValidation(true);
         configurator.configureURLMetadata(def);
+    }
+
+    private static boolean isUri(String uri) {
+        boolean isUri = false;
+        try {
+            new URI(uri);
+            isUri = true;
+        } catch (URISyntaxException e) {
+        }
+        return isUri;
     }
 }
