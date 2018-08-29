@@ -24,6 +24,7 @@ import org.cloudfoundry.identity.uaa.constants.OriginKeys;
 import org.cloudfoundry.identity.uaa.provider.IdentityProvider;
 import org.cloudfoundry.identity.uaa.provider.IdentityProviderProvisioning;
 import org.cloudfoundry.identity.uaa.provider.SamlIdentityProviderDefinition;
+import org.cloudfoundry.identity.uaa.provider.saml.idp.SamlServiceProviderProvisioning;
 import org.cloudfoundry.identity.uaa.saml.SamlKey;
 import org.cloudfoundry.identity.uaa.util.UaaUrlUtils;
 import org.cloudfoundry.identity.uaa.zone.IdentityZone;
@@ -43,38 +44,32 @@ import org.springframework.security.saml.provider.service.config.LocalServicePro
 import static org.cloudfoundry.identity.uaa.util.UaaStringUtils.getHostIfArgIsURL;
 import static org.springframework.util.StringUtils.hasText;
 
-public class SamlProviderConfigurationProvisioning {
+public class SamlProviderConfigurationProvisioning extends SamlServerConfiguration {
 
-    private final IdentityProviderProvisioning provisioning;
+    private final IdentityProviderProvisioning identityProviderProvisioning;
+    private final SamlServiceProviderProvisioning serviceProviderProvisioning;
 
-    public SamlProviderConfigurationProvisioning(IdentityProviderProvisioning provisioning) {
-        this.provisioning = provisioning;
+    public SamlProviderConfigurationProvisioning(
+        IdentityProviderProvisioning idpProvisioning,
+        SamlServiceProviderProvisioning spProvisioning
+        ) {
+        this.identityProviderProvisioning = idpProvisioning;
+        this.serviceProviderProvisioning = spProvisioning;
+        this.setNetwork(new NetworkConfiguration()
+                            .setConnectTimeout(10000)
+                            .setReadTimeout(10000));
     }
 
-
-    public SamlServerConfiguration getServerConfiguration() {
-        LocalIdentityProviderConfiguration idp = getIdentityProvider();
-        LocalServiceProviderConfiguration sp = getServiceProvider();
-        NetworkConfiguration network = new NetworkConfiguration()
-            .setConnectTimeout(10000)
-            .setReadTimeout(10000);
-
-        return new SamlServerConfiguration()
-            .setNetwork(network)
-            .setServiceProvider(sp)
-            .setIdentityProvider(idp);
-    }
-
-
-    private LocalIdentityProviderConfiguration getIdentityProvider() {
+    @Override
+    public LocalIdentityProviderConfiguration getIdentityProvider() {
         IdentityZoneConfiguration zconfig = getIdentityZone().getConfig();
         SamlConfig samlConfig = zconfig.getSamlConfig();
         return getIdentityProvider(samlConfig);
 
     }
 
-
-    private LocalServiceProviderConfiguration getServiceProvider() {
+    @Override
+    public LocalServiceProviderConfiguration getServiceProvider() {
         IdentityZone identityZone = getIdentityZone();
         IdentityZoneConfiguration zconfig = identityZone.getConfig();
         SamlConfig samlConfig = zconfig.getSamlConfig();
@@ -106,7 +101,7 @@ public class SamlProviderConfigurationProvisioning {
             .setSignMetadata(true)
             .setSingleLogoutEnabled(true);
         //TODO add all the configured IDPs here
-        List<IdentityProvider> activeProviders = provisioning.retrieveAll(true, zoneId);
+        List<IdentityProvider> activeProviders = identityProviderProvisioning.retrieveAll(true, zoneId);
         List<ExternalIdentityProviderConfiguration> idps =
             (List<ExternalIdentityProviderConfiguration>)activeProviders
                 .stream()

@@ -22,15 +22,17 @@ import org.cloudfoundry.identity.uaa.provider.IdentityProviderProvisioning;
 import org.cloudfoundry.identity.uaa.provider.saml.LoginSAMLAuthenticationFailureHandler;
 import org.cloudfoundry.identity.uaa.provider.saml.LoginSamlAuthenticationProvider;
 import org.cloudfoundry.identity.uaa.provider.saml.SamlIdentityProviderConfigurator;
+import org.cloudfoundry.identity.uaa.provider.saml.idp.SamlServiceProviderProvisioning;
 import org.cloudfoundry.identity.uaa.scim.ScimGroupExternalMembershipManager;
 import org.cloudfoundry.identity.uaa.user.UaaUserDatabase;
 
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.security.saml.provider.SamlServerConfiguration;
+import org.springframework.core.annotation.Order;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.saml.provider.service.authentication.SamlResponseAuthenticationFilter;
-import org.springframework.security.saml.provider.service.config.LocalServiceProviderConfiguration;
 import org.springframework.security.saml.provider.service.config.SamlServiceProviderSecurityConfiguration;
 import org.springframework.security.saml.util.Network;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
@@ -39,11 +41,14 @@ import org.springframework.security.web.authentication.logout.LogoutSuccessHandl
 import org.springframework.security.web.authentication.logout.SecurityContextLogoutHandler;
 
 @Configuration
+@EnableWebSecurity(debug = true)
+@Order(2)
 public class HostedSamlServiceProviderConfiguration extends SamlServiceProviderSecurityConfiguration {
 
     private AuthenticationSuccessHandler successHandler;
     private UaaUserDatabase userDatabase;
     private IdentityProviderProvisioning identityProviderProvisioning;
+    private SamlServiceProviderProvisioning serviceProviderProvisioning;
     private ScimGroupExternalMembershipManager externalMembershipManager;
     private LogoutSuccessHandler mainLogoutHandler;
     private LogoutHandler uaaAuthenticationFailureHandler;
@@ -51,23 +56,26 @@ public class HostedSamlServiceProviderConfiguration extends SamlServiceProviderS
     public HostedSamlServiceProviderConfiguration(
         @Qualifier("userDatabase") UaaUserDatabase userDb,
         @Qualifier("identityProviderProvisioning") IdentityProviderProvisioning idpProvisioning,
+        @Qualifier("serviceProviderProvisioning") SamlServiceProviderProvisioning serviceProviderProvisioning,
         @Qualifier("externalGroupMembershipManager") ScimGroupExternalMembershipManager extMbrManager,
         @Qualifier("successRedirectHandler") AuthenticationSuccessHandler successHandler,
         @Qualifier("logoutHandler") LogoutSuccessHandler logoutHandler,
         @Qualifier("uaaAuthenticationFailureHandler") LogoutHandler uaaAuthenticationFailureHandler) {
         super(
-            new SamlServerConfiguration()
-                .setServiceProvider(
-                    new LocalServiceProviderConfiguration()
-                        .setPrefix("/saml")
-                )
+            new SamlProviderConfigurationProvisioning(idpProvisioning, serviceProviderProvisioning)
         );
         this.userDatabase = userDb;
         this.identityProviderProvisioning = idpProvisioning;
+        this.serviceProviderProvisioning = serviceProviderProvisioning;
         this.externalMembershipManager = extMbrManager;
         this.successHandler = successHandler;
         this.mainLogoutHandler = logoutHandler;
         this.uaaAuthenticationFailureHandler = uaaAuthenticationFailureHandler;
+    }
+
+    @Override
+    public void configure(HttpSecurity http) throws Exception {
+        super.configure(http);
     }
 
     @Bean
@@ -106,6 +114,7 @@ public class HostedSamlServiceProviderConfiguration extends SamlServiceProviderS
     public SamlIdentityProviderConfigurator samlIdentityProviderConfigurator() {
         SamlIdentityProviderConfigurator result = new SamlIdentityProviderConfigurator();
         result.setIdentityProviderProvisioning(identityProviderProvisioning);
+        result.setResolver(getSamlProvisioning());
         return result;
     }
 

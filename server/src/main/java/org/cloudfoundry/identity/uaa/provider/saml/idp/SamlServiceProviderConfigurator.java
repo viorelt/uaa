@@ -137,19 +137,8 @@ public class SamlServiceProviderConfigurator {
     }
 
     protected ServiceProviderMetadata configureXMLMetadata(SamlServiceProvider provider) {
-//        ConfigMetadataProvider configMetadataProvider = new ConfigMetadataProvider(provider.getIdentityZoneId(),
-//          provider.getEntityId(), provider.getConfig().getMetaDataLocation());
-//        configMetadataProvider.setParserPool(getParserPool());
-//        ExtendedMetadata extendedMetadata = new ExtendedMetadata();
-//        extendedMetadata.setLocal(false);
-//        extendedMetadata.setAlias(provider.getEntityId());
-//        ExtendedMetadataDelegate delegate = new ExtendedMetadataDelegate(configMetadataProvider, extendedMetadata);
-//        delegate.setMetadataTrustCheck(provider.getConfig().isMetadataTrustCheck());
-
-        String zoneId = provider.getIdentityZoneId();
         String alias = provider.getEntityId();
         String metadata = provider.getConfig().getMetaDataLocation();
-        ServiceProviderMetadata delegate = null;
 
         ExternalServiceProviderConfiguration config = new ExternalServiceProviderConfiguration()
             .setAlias(alias)
@@ -158,7 +147,6 @@ public class SamlServiceProviderConfigurator {
             .setMetadataTrustCheck(provider.getConfig().isMetadataTrustCheck());
 
         return getResolver().getHostedProvider().getRemoteProvider(config);
-
     }
 
     protected ServiceProviderMetadata configureURLMetadata(SamlServiceProvider provider) throws RuntimeException {

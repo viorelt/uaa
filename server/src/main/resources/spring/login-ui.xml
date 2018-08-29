@@ -284,6 +284,7 @@
     <bean id="reAuthenticationRequiredFilter" class="org.cloudfoundry.identity.uaa.authentication.ReAuthenticationRequiredFilter">
     </bean>
 
+    <!--
     <http name="samlIdpSecurity"
           use-expressions="true"
           pattern="/saml/idp/**"
@@ -304,6 +305,7 @@
         <custom-filter ref="samlFilter" position="LAST"/>
         <csrf disabled="true"/>
     </http>
+    -->
 
     <http name="uiSecurity"
           use-expressions="true"
