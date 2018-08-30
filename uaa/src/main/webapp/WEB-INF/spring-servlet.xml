@@ -417,6 +417,9 @@
     <bean id="oauthAccessDeniedHandler" class="org.springframework.security.oauth2.provider.error.OAuth2AccessDeniedHandler" />
 
 
+    <!-- SAML Java Configuration -->
+    <context:component-scan base-package="org.cloudfoundry.identity.uaa.impl.config.saml"/>
+
     <!--<import resource="spring/saml-providers.xml"/>-->
     <!--<import resource="spring/saml-idp.xml"/>-->
     <import resource="classpath:spring/login-ui.xml"/>
@@ -505,10 +508,6 @@
 
     <context:annotation-config/>
     <bean id="restTemplateConfig" class="org.cloudfoundry.identity.uaa.impl.config.RestTemplateConfig"/>
-
-    <!-- SAML Java Configuration -->
-    <context:component-scan base-package="org.cloudfoundry.identity.uaa.impl.config.saml"/>
-
 
     <bean id="idpBootstrap" class="org.cloudfoundry.identity.uaa.impl.config.IdentityProviderBootstrap">
         <constructor-arg ref="identityProviderProvisioning"/>

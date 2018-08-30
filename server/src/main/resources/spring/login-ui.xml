@@ -284,7 +284,32 @@
     <bean id="reAuthenticationRequiredFilter" class="org.cloudfoundry.identity.uaa.authentication.ReAuthenticationRequiredFilter">
     </bean>
 
-    <!--
+    <bean id="compositeSpFilter" class="org.springframework.web.filter.CompositeFilter">
+        <property name="filters">
+            <list>
+                <ref bean="spSamlConfigurationFilter"/>
+                <ref bean="spMetadataFilter"/>
+                <ref bean="spAuthenticationRequestFilter"/>
+                <ref bean="spAuthenticationResponseFilter"/>
+                <ref bean="spSamlLogoutFilter"/>
+                <ref bean="spSelectIdentityProviderFilter"/>
+            </list>
+        </property>
+    </bean>
+
+    <bean id="compositeIdpFilter" class="org.springframework.web.filter.CompositeFilter">
+        <property name="filters">
+            <list>
+                <ref bean="idpSamlConfigurationFilter"/>
+                <ref bean="idpMetadataFilter"/>
+                <ref bean="idpInitatedLoginFilter"/>
+                <ref bean="idpAuthnRequestFilter"/>
+                <ref bean="idpLogoutFilter"/>
+                <ref bean="idpSelectServiceProviderFilter"/>
+            </list>
+        </property>
+    </bean>
+
     <http name="samlIdpSecurity"
           use-expressions="true"
           pattern="/saml/idp/**"
@@ -292,7 +317,7 @@
           xmlns="http://www.springframework.org/schema/security">
         <intercept-url pattern="/SSO/**" access="isFullyAuthenticated()"/>
         <intercept-url pattern="/**" access="permitAll()"/>
-        <custom-filter ref="samlFilter" position="LAST"/>
+        <custom-filter ref="compositeIdpFilter" position="LAST"/>
         <csrf disabled="true"/>
     </http>
 
@@ -302,10 +327,9 @@
           entry-point-ref="loginEntryPoint"
           xmlns="http://www.springframework.org/schema/security">
         <intercept-url pattern="/**" access="permitAll()"/>
-        <custom-filter ref="samlFilter" position="LAST"/>
+        <custom-filter ref="compositeSpFilter" position="LAST"/>
         <csrf disabled="true"/>
     </http>
-    -->
 
     <http name="uiSecurity"
           use-expressions="true"

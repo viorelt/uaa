@@ -14,26 +14,31 @@
 
 package org.cloudfoundry.identity.uaa.impl.config.saml;
 
+import javax.servlet.Filter;
+import javax.servlet.http.HttpServletRequest;
+
 import org.cloudfoundry.identity.uaa.provider.IdentityProviderProvisioning;
 import org.cloudfoundry.identity.uaa.provider.saml.idp.SamlServiceProviderConfigurator;
 import org.cloudfoundry.identity.uaa.provider.saml.idp.SamlServiceProviderProvisioning;
 import org.cloudfoundry.identity.uaa.scim.ScimGroupExternalMembershipManager;
 import org.cloudfoundry.identity.uaa.user.UaaUserDatabase;
+import org.cloudfoundry.identity.uaa.zone.IdentityZone;
+import org.cloudfoundry.identity.uaa.zone.IdentityZoneProvisioning;
 
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.annotation.Order;
-import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.saml.provider.identity.config.SamlIdentityProviderSecurityConfiguration;
+import org.springframework.context.annotation.DependsOn;
+import org.springframework.security.saml.provider.SamlServerConfiguration;
+import org.springframework.security.saml.provider.config.ThreadLocalSamlConfigurationFilter;
+import org.springframework.security.saml.provider.config.ThreadLocalSamlConfigurationRepository;
+import org.springframework.security.saml.provider.identity.config.SamlIdentityProviderServerBeanConfiguration;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.security.web.authentication.logout.LogoutHandler;
 import org.springframework.security.web.authentication.logout.LogoutSuccessHandler;
 
 @Configuration
-@EnableWebSecurity
-@Order(1)
-public class HostedSamlIdentityProviderConfiguration extends SamlIdentityProviderSecurityConfiguration {
+public class HostedSamlIdentityProviderConfiguration extends SamlIdentityProviderServerBeanConfiguration {
 
     private AuthenticationSuccessHandler successHandler;
     private UaaUserDatabase userDatabase;
@@ -42,8 +47,10 @@ public class HostedSamlIdentityProviderConfiguration extends SamlIdentityProvide
     private ScimGroupExternalMembershipManager externalMembershipManager;
     private LogoutSuccessHandler mainLogoutHandler;
     private LogoutHandler uaaAuthenticationFailureHandler;
+    private IdentityZoneProvisioning zoneProvisioning;
 
     public HostedSamlIdentityProviderConfiguration(
+        IdentityZoneProvisioning zoneProvisioning,
         @Qualifier("userDatabase") UaaUserDatabase userDb,
         @Qualifier("identityProviderProvisioning") IdentityProviderProvisioning idpProvisioning,
         @Qualifier("serviceProviderProvisioning") SamlServiceProviderProvisioning serviceProviderProvisioning,
@@ -51,9 +58,6 @@ public class HostedSamlIdentityProviderConfiguration extends SamlIdentityProvide
         @Qualifier("successRedirectHandler") AuthenticationSuccessHandler successHandler,
         @Qualifier("logoutHandler") LogoutSuccessHandler logoutHandler,
         @Qualifier("uaaAuthenticationFailureHandler") LogoutHandler uaaAuthenticationFailureHandler) {
-        super(
-            new SamlProviderConfigurationProvisioning(idpProvisioning, serviceProviderProvisioning)
-        );
         this.userDatabase = userDb;
         this.identityProviderProvisioning = idpProvisioning;
         this.serviceProviderProvisioning = serviceProviderProvisioning;
@@ -61,6 +65,25 @@ public class HostedSamlIdentityProviderConfiguration extends SamlIdentityProvide
         this.successHandler = successHandler;
         this.mainLogoutHandler = logoutHandler;
         this.uaaAuthenticationFailureHandler = uaaAuthenticationFailureHandler;
+        this.zoneProvisioning = zoneProvisioning;
+    }
+
+    @Bean("idpSamlProviderConfigurationProvisioning")
+    public SamlProviderConfigurationProvisioning getIdpSamlProviderConfigurationProvisioning() {
+        return new SamlProviderConfigurationProvisioning(identityProviderProvisioning, serviceProviderProvisioning);
+    }
+
+    @Override
+    @Bean(name = "idpSamlConfigurationFilter")
+    public Filter samlConfigurationFilter() {
+        return new ThreadLocalSamlConfigurationFilter(
+            (ThreadLocalSamlConfigurationRepository) samlConfigurationRepository()
+        ) {
+            @Override
+            protected SamlServerConfiguration getConfiguration(HttpServletRequest request) {
+                return getIdpSamlProviderConfigurationProvisioning().getSamlServerConfiguration();
+            }
+        };
     }
 
     @Bean(name = "spMetaDataProviders")
@@ -71,5 +94,11 @@ public class HostedSamlIdentityProviderConfiguration extends SamlIdentityProvide
         return result;
     }
 
+    @Override
+    @DependsOn("identityZoneConfigurationBootstrap")
+    protected SamlServerConfiguration getBasicSamlServerConfiguration() {
+        IdentityZone zone = zoneProvisioning.retrieve(IdentityZone.getUaa().getId());
+        return getIdpSamlProviderConfigurationProvisioning().getSamlServerConfiguration(zone);
+    }
 
 }

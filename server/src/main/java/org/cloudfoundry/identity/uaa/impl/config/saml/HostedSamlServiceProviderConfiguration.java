@@ -15,6 +15,7 @@
 package org.cloudfoundry.identity.uaa.impl.config.saml;
 
 import javax.servlet.Filter;
+import javax.servlet.http.HttpServletRequest;
 
 import org.cloudfoundry.identity.uaa.authentication.SamlRedirectLogoutHandler;
 import org.cloudfoundry.identity.uaa.authentication.UaaSamlLogoutFilter;
@@ -25,15 +26,21 @@ import org.cloudfoundry.identity.uaa.provider.saml.SamlIdentityProviderConfigura
 import org.cloudfoundry.identity.uaa.provider.saml.idp.SamlServiceProviderProvisioning;
 import org.cloudfoundry.identity.uaa.scim.ScimGroupExternalMembershipManager;
 import org.cloudfoundry.identity.uaa.user.UaaUserDatabase;
+import org.cloudfoundry.identity.uaa.zone.IdentityZone;
+import org.cloudfoundry.identity.uaa.zone.IdentityZoneProvisioning;
 
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.annotation.Order;
-import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.context.annotation.DependsOn;
+import org.springframework.security.saml.provider.SamlServerConfiguration;
+import org.springframework.security.saml.provider.config.ThreadLocalSamlConfigurationFilter;
+import org.springframework.security.saml.provider.config.ThreadLocalSamlConfigurationRepository;
+import org.springframework.security.saml.provider.provisioning.HostBasedSamlServiceProviderProvisioning;
+import org.springframework.security.saml.provider.provisioning.SamlProviderProvisioning;
+import org.springframework.security.saml.provider.service.ServiceProviderService;
 import org.springframework.security.saml.provider.service.authentication.SamlResponseAuthenticationFilter;
-import org.springframework.security.saml.provider.service.config.SamlServiceProviderSecurityConfiguration;
+import org.springframework.security.saml.provider.service.config.SamlServiceProviderServerBeanConfiguration;
 import org.springframework.security.saml.util.Network;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.security.web.authentication.logout.LogoutHandler;
@@ -41,9 +48,7 @@ import org.springframework.security.web.authentication.logout.LogoutSuccessHandl
 import org.springframework.security.web.authentication.logout.SecurityContextLogoutHandler;
 
 @Configuration
-@EnableWebSecurity(debug = true)
-@Order(2)
-public class HostedSamlServiceProviderConfiguration extends SamlServiceProviderSecurityConfiguration {
+public class HostedSamlServiceProviderConfiguration extends SamlServiceProviderServerBeanConfiguration {
 
     private AuthenticationSuccessHandler successHandler;
     private UaaUserDatabase userDatabase;
@@ -52,8 +57,10 @@ public class HostedSamlServiceProviderConfiguration extends SamlServiceProviderS
     private ScimGroupExternalMembershipManager externalMembershipManager;
     private LogoutSuccessHandler mainLogoutHandler;
     private LogoutHandler uaaAuthenticationFailureHandler;
+    private IdentityZoneProvisioning zoneProvisioning;
 
     public HostedSamlServiceProviderConfiguration(
+        IdentityZoneProvisioning zoneProvisioning,
         @Qualifier("userDatabase") UaaUserDatabase userDb,
         @Qualifier("identityProviderProvisioning") IdentityProviderProvisioning idpProvisioning,
         @Qualifier("serviceProviderProvisioning") SamlServiceProviderProvisioning serviceProviderProvisioning,
@@ -61,9 +68,6 @@ public class HostedSamlServiceProviderConfiguration extends SamlServiceProviderS
         @Qualifier("successRedirectHandler") AuthenticationSuccessHandler successHandler,
         @Qualifier("logoutHandler") LogoutSuccessHandler logoutHandler,
         @Qualifier("uaaAuthenticationFailureHandler") LogoutHandler uaaAuthenticationFailureHandler) {
-        super(
-            new SamlProviderConfigurationProvisioning(idpProvisioning, serviceProviderProvisioning)
-        );
         this.userDatabase = userDb;
         this.identityProviderProvisioning = idpProvisioning;
         this.serviceProviderProvisioning = serviceProviderProvisioning;
@@ -71,11 +75,36 @@ public class HostedSamlServiceProviderConfiguration extends SamlServiceProviderS
         this.successHandler = successHandler;
         this.mainLogoutHandler = logoutHandler;
         this.uaaAuthenticationFailureHandler = uaaAuthenticationFailureHandler;
+        this.zoneProvisioning = zoneProvisioning;
     }
 
     @Override
-    public void configure(HttpSecurity http) throws Exception {
-        super.configure(http);
+    @Bean(name = "samlServiceProviderProvisioning")
+    public SamlProviderProvisioning<ServiceProviderService> getSamlProvisioning() {
+        return new SamlServiceProviderCustomizer(
+            samlConfigurationRepository(),
+            samlTransformer(),
+            samlValidator(),
+            samlMetadataCache(samlNetworkHandler())
+        );
+    }
+
+    @Bean("spSamlProviderConfigurationProvisioning")
+    public SamlProviderConfigurationProvisioning getSpSamlProviderConfigurationProvisioning() {
+        return new SamlProviderConfigurationProvisioning(identityProviderProvisioning, serviceProviderProvisioning);
+    }
+
+    @Override
+    @Bean(name = "spSamlConfigurationFilter")
+    public Filter samlConfigurationFilter() {
+        return new ThreadLocalSamlConfigurationFilter(
+            (ThreadLocalSamlConfigurationRepository) samlConfigurationRepository()
+        ) {
+            @Override
+            protected SamlServerConfiguration getConfiguration(HttpServletRequest request) {
+                return getSpSamlProviderConfigurationProvisioning().getSamlServerConfiguration();
+            }
+        };
     }
 
     @Bean
@@ -168,5 +197,10 @@ public class HostedSamlServiceProviderConfiguration extends SamlServiceProviderS
         );
     }
 
-
+    @Override
+    @DependsOn("identityZoneConfigurationBootstrap")
+    protected SamlServerConfiguration getBasicSamlServerConfiguration() {
+        IdentityZone zone = zoneProvisioning.retrieve(IdentityZone.getUaa().getId());
+        return getSpSamlProviderConfigurationProvisioning().getSamlServerConfiguration(zone);
+    }
 }
