@@ -91,6 +91,7 @@ import static java.util.Collections.emptyList;
 import static java.util.Optional.ofNullable;
 import static org.cloudfoundry.identity.uaa.oauth.jwk.JsonWebKey.KeyType.MAC;
 import static org.cloudfoundry.identity.uaa.oauth.jwk.JsonWebKey.KeyType.RSA;
+import static org.cloudfoundry.identity.uaa.oauth.token.ClaimConstants.ORIGIN;
 import static org.cloudfoundry.identity.uaa.oauth.token.ClaimConstants.SUB;
 import static org.cloudfoundry.identity.uaa.oauth.token.TokenConstants.GRANT_TYPE_AUTHORIZATION_CODE;
 import static org.cloudfoundry.identity.uaa.provider.ExternalIdentityProviderDefinition.EMAIL_ATTRIBUTE_NAME;
@@ -151,19 +152,19 @@ public class XOAuthAuthenticationManager extends ExternalLoginAuthenticationMana
                 throw new InsufficientAuthenticationException("Issuer is missing in id_token");
             }
             try {
-                return ((XOAuthProviderConfigurator) getProviderProvisioning()).retrieveByIssuer(issuer, IdentityZoneHolder.get().getId());
-            } catch (IncorrectResultSizeDataAccessException x) {
                 if (tokenEndpointBuilder.getTokenEndpoint().equals(issuer)) {
                     OIDCIdentityProviderDefinition uaaOidcProviderConfig = new OIDCIdentityProviderDefinition();
                     uaaOidcProviderConfig.setTokenKeyUrl(new URL(contextPath + "/token_keys"));
                     uaaOidcProviderConfig.setIssuer(issuer);
                     IdentityProvider uaaIdp = new IdentityProvider();
-                    uaaIdp.setOriginKey(OriginKeys.UAA);
+                    uaaIdp.setOriginKey(claims.get(ORIGIN).toString());
                     uaaIdp.setConfig(uaaOidcProviderConfig);
                     return uaaIdp;
-                } else {
-                    throw new InsufficientAuthenticationException(String.format("Unable to map issuer, %s , to a single registered provider", issuer));
                 }
+
+                return ((XOAuthProviderConfigurator) getProviderProvisioning()).retrieveByIssuer(issuer, IdentityZoneHolder.get().getId());
+            } catch (IncorrectResultSizeDataAccessException x) {
+                throw new InsufficientAuthenticationException(String.format("Unable to map issuer, %s , to a single registered provider", issuer));
             }
         } catch (IllegalArgumentException | JsonUtils.JsonUtilException x) {
             throw new InsufficientAuthenticationException("Unable to decode expected id_token");
