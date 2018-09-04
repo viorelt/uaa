@@ -72,7 +72,7 @@ public class SamlMetadataMockMvcTests extends InjectedMockContextTest {
             .andExpect(status().isOk())
             .andReturn().getResponse().getContentAsString();
 
-        //meldCommand(format(expected), format(actual));
+        meldCommand(format(expected), format(actual));
         assertThat(format(actual), equalTo(format(expected)));
     }
 

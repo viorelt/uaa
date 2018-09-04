@@ -292,7 +292,6 @@
                 <ref bean="spAuthenticationRequestFilter"/>
                 <ref bean="spAuthenticationResponseFilter"/>
                 <ref bean="spSamlLogoutFilter"/>
-                <ref bean="spSelectIdentityProviderFilter"/>
             </list>
         </property>
     </bean>

@@ -24,7 +24,6 @@ import org.springframework.security.saml.saml2.metadata.NameId;
 import org.springframework.security.saml.saml2.metadata.ServiceProviderMetadata;
 import org.springframework.security.saml.spi.SpringSecuritySaml;
 import org.springframework.security.saml.spi.opensaml.OpenSamlImplementation;
-import org.springframework.security.saml.util.Network;
 
 import static java.util.Arrays.asList;
 import static org.cloudfoundry.identity.uaa.provider.saml.SamlTestKey.IDP_RSA_KEY;
@@ -36,7 +35,6 @@ public class SamlTestData {
     private final String spBaseUrl;
     private Clock time = Clock.systemUTC();
     private SpringSecuritySaml implementation = new OpenSamlImplementation(time).init();
-    private Network network = new Network();
     private SamlTestObjectHelper helper;
 
     public SamlTestData(String idpBaseUrl, String spBaseUrl) {

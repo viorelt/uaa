@@ -33,7 +33,6 @@ import org.springframework.security.saml.saml2.authentication.NameIdPrincipal;
 import org.springframework.security.saml.saml2.metadata.IdentityProviderMetadata;
 import org.springframework.security.saml.saml2.metadata.ServiceProviderMetadata;
 
-import org.springframework.security.saml.util.Network;
 import org.springframework.security.web.authentication.logout.LogoutHandler;
 import org.springframework.web.util.UriComponentsBuilder;
 import org.springframework.web.util.UriUtils;
@@ -41,12 +40,10 @@ import org.springframework.web.util.UriUtils;
 public class SimpleSpLogoutHandler implements LogoutHandler {
 
     private final SamlProviderProvisioning<ServiceProviderService> resolver;
-    private final Network network;
     private final SamlTransformer transformer;
 
-    public SimpleSpLogoutHandler(SamlProviderProvisioning<ServiceProviderService> resolver, Network network, SamlTransformer transformer) {
+    public SimpleSpLogoutHandler(SamlProviderProvisioning<ServiceProviderService> resolver, SamlTransformer transformer) {
         this.resolver = resolver;
-        this.network = network;
         this.transformer = transformer;
     }
 
@@ -56,10 +53,6 @@ public class SimpleSpLogoutHandler implements LogoutHandler {
 
     public SamlTransformer getTransformer() {
         return transformer;
-    }
-
-    public Network getNetwork() {
-        return network;
     }
 
     @Override

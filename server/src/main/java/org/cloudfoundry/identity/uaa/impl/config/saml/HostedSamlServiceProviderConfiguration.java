@@ -36,12 +36,10 @@ import org.springframework.context.annotation.DependsOn;
 import org.springframework.security.saml.provider.SamlServerConfiguration;
 import org.springframework.security.saml.provider.config.ThreadLocalSamlConfigurationFilter;
 import org.springframework.security.saml.provider.config.ThreadLocalSamlConfigurationRepository;
-import org.springframework.security.saml.provider.provisioning.HostBasedSamlServiceProviderProvisioning;
 import org.springframework.security.saml.provider.provisioning.SamlProviderProvisioning;
 import org.springframework.security.saml.provider.service.ServiceProviderService;
 import org.springframework.security.saml.provider.service.authentication.SamlResponseAuthenticationFilter;
 import org.springframework.security.saml.provider.service.config.SamlServiceProviderServerBeanConfiguration;
-import org.springframework.security.saml.util.Network;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.security.web.authentication.logout.LogoutHandler;
 import org.springframework.security.web.authentication.logout.LogoutSuccessHandler;
@@ -85,7 +83,7 @@ public class HostedSamlServiceProviderConfiguration extends SamlServiceProviderS
             samlConfigurationRepository(),
             samlTransformer(),
             samlValidator(),
-            samlMetadataCache(samlNetworkHandler())
+            samlMetadataCache()
         );
     }
 
@@ -117,7 +115,6 @@ public class HostedSamlServiceProviderConfiguration extends SamlServiceProviderS
         filter.setAuthenticationSuccessHandler(successHandler);
         return filter;
     }
-
 
     @Bean(name = "samlLogoutHandler")
     public LogoutHandler logoutHandler() {
@@ -164,9 +161,6 @@ public class HostedSamlServiceProviderConfiguration extends SamlServiceProviderS
     public SimpleSpLogoutHandler getSimpleSpLogoutHandler() {
         return new SimpleSpLogoutHandler(
             getSamlProvisioning(),
-            new Network() //TODO
-                .setReadTimeoutMillis(10000)
-                .setConnectTimeoutMillis(10000),
             samlTransformer()
         );
     }
@@ -190,17 +184,32 @@ public class HostedSamlServiceProviderConfiguration extends SamlServiceProviderS
             samlValidator(),
             getSamlProvisioning(),
             samlTransformer(),
-            new Network()
-                .setConnectTimeoutMillis(10000)
-                .setReadTimeoutMillis(10000),//TODO
             samlAuthenticationManager()
         );
     }
 
     @Override
     @DependsOn("identityZoneConfigurationBootstrap")
-    protected SamlServerConfiguration getBasicSamlServerConfiguration() {
+    protected SamlServerConfiguration getDefaultHostSamlServerConfiguration() {
         IdentityZone zone = zoneProvisioning.retrieve(IdentityZone.getUaa().getId());
         return getSpSamlProviderConfigurationProvisioning().getSamlServerConfiguration(zone);
+    }
+
+    @Override
+    @Bean
+    public Filter spMetadataFilter() {
+        return super.spMetadataFilter();
+    }
+
+    @Override
+    @Bean
+    public Filter spAuthenticationRequestFilter() {
+        return super.spAuthenticationRequestFilter();
+    }
+
+    @Override
+    @Bean
+    public Filter spSamlLogoutFilter() {
+        return super.spSamlLogoutFilter();
     }
 }

@@ -14,6 +14,7 @@
  */
 package org.cloudfoundry.identity.uaa.provider.saml.idp;
 
+import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.time.Clock;
@@ -45,7 +46,8 @@ import org.springframework.security.saml.spi.DefaultMetadataCache;
 import org.springframework.security.saml.spi.DefaultSamlTransformer;
 import org.springframework.security.saml.spi.SpringSecuritySaml;
 import org.springframework.security.saml.spi.opensaml.OpenSamlImplementation;
-import org.springframework.security.saml.util.Network;
+import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.client.RestOperations;
 
 import static org.cloudfoundry.identity.uaa.provider.saml.idp.SamlTestUtils.MOCK_SP_ENTITY_ID;
 import static org.cloudfoundry.identity.uaa.provider.saml.idp.SamlTestUtils.mockSamlServiceProvider;
@@ -55,15 +57,15 @@ import static org.cloudfoundry.identity.uaa.provider.saml.idp.SamlTestUtils.mock
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
 
 public class SamlServiceProviderConfiguratorTest {
 
     private static SpringSecuritySaml implementation;
-    private Network mockNetwork = spy(new Network());
+    private RestOperations mockNetwork;
 
     @BeforeClass
     public static void initializeOpenSAML() throws Exception {
@@ -80,14 +82,14 @@ public class SamlServiceProviderConfiguratorTest {
     @Rule
     public ExpectedException expectedEx = ExpectedException.none();
     private SlowHttpServer slowHttpServer;
-    private RestTemplateConfig restTemplateConfig;
 
     @Before
     public void setup() throws Exception {
         samlTestUtils.initialize();
         conf = new SamlServiceProviderConfigurator();
         DefaultSamlTransformer samlTransformer = new DefaultSamlTransformer(implementation);
-        DefaultMetadataCache cache = new DefaultMetadataCache(Clock.systemUTC(), mockNetwork);
+        mockNetwork = mock(RestOperations.class);
+        DefaultMetadataCache cache = new DefaultMetadataCache(Clock.systemUTC(), mockNetwork, mockNetwork);
         HostBasedSamlIdentityProviderProvisioning resolver = mock(HostBasedSamlIdentityProviderProvisioning.class);
         conf.setResolver(resolver);
         IdentityProviderService identityProviderService = mock(IdentityProviderService.class);
@@ -246,12 +248,10 @@ public class SamlServiceProviderConfiguratorTest {
     public void testGetExtendedMetadataDelegateUrl() throws Exception {
         slowHttpServer.run();
         expectedEx.expect(SamlMetadataException.class);
-        mockNetwork
-            .setReadTimeoutMillis(100)
-            .setConnectTimeoutMillis(100);
-
+        when(mockNetwork.getForObject(anyString(), any())).thenThrow(
+            new ResourceAccessException("Simulating a timeout", new SocketTimeoutException("mock"))
+        );
         SamlServiceProvider provider = mockSamlServiceProviderMetadatauriForZone("https://localhost:" + SlowHttpServer.PORT);
-
         conf.getExtendedMetadataDelegate(provider);
     }
 

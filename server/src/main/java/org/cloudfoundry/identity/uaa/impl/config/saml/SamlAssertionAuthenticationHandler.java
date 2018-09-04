@@ -32,7 +32,6 @@ import org.springframework.security.saml.saml2.authentication.Assertion;
 import org.springframework.security.saml.saml2.metadata.IdentityProviderMetadata;
 import org.springframework.security.saml.saml2.metadata.ServiceProviderMetadata;
 import org.springframework.security.saml.spi.DefaultSamlAuthentication;
-import org.springframework.security.saml.util.Network;
 import org.springframework.security.saml.validation.ValidationException;
 
 import static org.springframework.http.HttpMethod.GET;
@@ -42,18 +41,15 @@ public class SamlAssertionAuthenticationHandler {
     private final SamlValidator validator;
     private final SamlProviderProvisioning<ServiceProviderService> resolver;
     private final SamlTransformer transformer;
-    private final Network network;
     private final LoginSamlAuthenticationProvider authenticationProvider;
 
     public SamlAssertionAuthenticationHandler(SamlValidator validator,
                                               SamlProviderProvisioning<ServiceProviderService> resolver,
                                               SamlTransformer transformer,
-                                              Network network,
                                               LoginSamlAuthenticationProvider authenticationProvider) {
         this.validator = validator;
         this.resolver = resolver;
         this.transformer = transformer;
-        this.network = network;
         this.authenticationProvider = authenticationProvider;
     }
 

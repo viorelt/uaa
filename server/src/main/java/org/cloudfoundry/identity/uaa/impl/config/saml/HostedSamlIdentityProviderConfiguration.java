@@ -96,9 +96,38 @@ public class HostedSamlIdentityProviderConfiguration extends SamlIdentityProvide
 
     @Override
     @DependsOn("identityZoneConfigurationBootstrap")
-    protected SamlServerConfiguration getBasicSamlServerConfiguration() {
+    protected SamlServerConfiguration getDefaultHostSamlServerConfiguration() {
         IdentityZone zone = zoneProvisioning.retrieve(IdentityZone.getUaa().getId());
         return getIdpSamlProviderConfigurationProvisioning().getSamlServerConfiguration(zone);
     }
 
+    @Override
+    @Bean
+    public Filter idpMetadataFilter() {
+        return super.idpMetadataFilter();
+    }
+
+    @Override
+    @Bean
+    public Filter idpInitatedLoginFilter() {
+        return super.idpInitatedLoginFilter();
+    }
+
+    @Override
+    @Bean
+    public Filter idpAuthnRequestFilter() {
+        return super.idpAuthnRequestFilter();
+    }
+
+    @Override
+    @Bean
+    public Filter idpLogoutFilter() {
+        return super.idpLogoutFilter();
+    }
+
+    @Override
+    @Bean
+    public Filter idpSelectServiceProviderFilter() {
+        return super.idpSelectServiceProviderFilter();
+    }
 }

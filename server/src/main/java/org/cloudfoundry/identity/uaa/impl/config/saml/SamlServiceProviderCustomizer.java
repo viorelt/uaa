@@ -20,7 +20,6 @@ import java.util.List;
 import org.springframework.security.saml.SamlMetadataCache;
 import org.springframework.security.saml.SamlTransformer;
 import org.springframework.security.saml.SamlValidator;
-import org.springframework.security.saml.key.KeyType;
 import org.springframework.security.saml.key.SimpleKey;
 import org.springframework.security.saml.provider.config.SamlConfigurationRepository;
 import org.springframework.security.saml.provider.provisioning.HostBasedSamlServiceProviderProvisioning;
@@ -42,7 +41,6 @@ public class SamlServiceProviderCustomizer extends HostBasedSamlServiceProviderP
     public ServiceProviderService getHostedProvider() {
         ServiceProviderService result = super.getHostedProvider();
         customizeLogoutEndpoints(result);
-        customizeUsageKeys(result);
         customizeSigning(result);
         customizeEntityDescriptorId(result);
         customizeNameIdFormats(result);
@@ -100,26 +98,6 @@ public class SamlServiceProviderCustomizer extends HostBasedSamlServiceProviderP
     private void customizeEntityDescriptorId(ServiceProviderService result) {
         result.getMetadata().getServiceProvider().setId(result.getMetadata().getEntityAlias());
         result.getMetadata().setId(result.getMetadata().getEntityAlias());
-    }
-
-    private void customizeUsageKeys(ServiceProviderService result) {
-        List<SimpleKey> keys = result.getMetadata().getServiceProvider().getKeys();
-        List<SimpleKey> newKeys = new LinkedList<>();
-        keys.stream().forEach(
-            k -> {
-                newKeys.add(k);
-                newKeys.add(
-                    new SimpleKey(
-                        k.getName(),
-                        k.getPrivateKey(),
-                        k.getCertificate(),
-                        k.getPassphrase(),
-                        KeyType.ENCRYPTION
-                    )
-                );
-            }
-        );
-        result.getMetadata().getServiceProvider().setKeys(newKeys);
     }
 
     private void customizeLogoutEndpoints(ServiceProviderService result) {
